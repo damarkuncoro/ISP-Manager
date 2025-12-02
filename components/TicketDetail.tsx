@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { Ticket, TicketStatus, TicketPriority, TicketCategory } from '../types';
-import { ArrowLeft, Edit2, Trash2, User, MapPin, Calendar, Clock, CheckCircle2, AlertCircle, Wifi, CreditCard, Router, Wrench, HelpCircle, FileText, Activity, Send, AlertTriangle, CheckSquare } from 'lucide-react';
+import { Ticket, TicketStatus, TicketPriority, TicketCategory, Employee } from '../types';
+import { ArrowLeft, Edit2, Trash2, User, MapPin, Calendar, Clock, CheckCircle2, AlertCircle, Wifi, CreditCard, Router, Wrench, HelpCircle, FileText, Activity, Send, AlertTriangle, CheckSquare, X, ShieldAlert } from 'lucide-react';
 import { useComments } from '../hooks/useComments';
 
 interface TicketDetailProps {
@@ -10,6 +10,7 @@ interface TicketDetailProps {
   onEdit: (ticket: Ticket) => void;
   onDelete: (id: string) => void;
   onCustomerClick: (customerId: string) => void;
+  employees?: Employee[];
 }
 
 const StatusBadge = ({ status }: { status: TicketStatus }) => {
@@ -68,10 +69,22 @@ const CategoryIcon = ({ category }: { category: TicketCategory }) => {
   );
 };
 
-export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onBack, onEdit, onDelete, onCustomerClick }) => {
+export const TicketDetail: React.FC<TicketDetailProps> = ({ 
+  ticket, 
+  onBack, 
+  onEdit, 
+  onDelete, 
+  onCustomerClick,
+  employees = []
+}) => {
   const { comments, loading: commentsLoading, addComment } = useComments(ticket.id);
   const [newComment, setNewComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+
+  // Escalation Modal State
+  const [showEscalationModal, setShowEscalationModal] = useState(false);
+  const [escalationReason, setEscalationReason] = useState('');
+  const [escalationAssignee, setEscalationAssignee] = useState('');
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,17 +101,42 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onBack, onEd
     }
   };
 
-  const handleEscalate = async () => {
-    if(window.confirm("Escalate this ticket to Tier 2 Support?")) {
-        await addComment("SYSTEM: Ticket escalated to Tier 2 due to critical impact.", "System");
-        onEdit({...ticket, is_escalated: true, priority: TicketPriority.HIGH});
+  const handleEscalateClick = () => {
+    setShowEscalationModal(true);
+    setEscalationReason('');
+    setEscalationAssignee('');
+  };
+
+  const confirmEscalation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!escalationReason.trim()) {
+        alert("Please provide a reason for escalation.");
+        return;
+    }
+
+    try {
+        await addComment(`🚨 **TICKET ESCALATED**\n\n**Reason:** ${escalationReason}\n${escalationAssignee ? `**Reassigned to:** ${escalationAssignee}` : ''}`, "System");
+        
+        const updates: Partial<Ticket> = {
+            is_escalated: true,
+            priority: TicketPriority.HIGH
+        };
+        
+        if (escalationAssignee) {
+            updates.assigned_to = escalationAssignee;
+        }
+
+        onEdit({ ...ticket, ...updates });
+        setShowEscalationModal(false);
+    } catch (err) {
+        alert("Failed to process escalation.");
     }
   };
   
   const isOverdue = ticket.due_date && new Date(ticket.due_date) < new Date() && ticket.status !== TicketStatus.CLOSED;
 
   return (
-    <div className="space-y-6 animate-in slide-in-from-right-4 duration-500">
+    <div className="space-y-6 animate-in slide-in-from-right-4 duration-500 relative">
       
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-gray-200 pb-6">
@@ -133,7 +171,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onBack, onEd
         <div className="flex flex-wrap gap-2 self-end sm:self-start">
            {!ticket.is_escalated && ticket.status !== TicketStatus.CLOSED && (
                <button 
-                onClick={handleEscalate}
+                onClick={handleEscalateClick}
                 className="inline-flex items-center px-4 py-2 border border-red-200 shadow-sm text-sm font-medium rounded-lg text-red-700 bg-red-50 hover:bg-red-100 transition-colors"
                >
                  <AlertTriangle className="w-4 h-4 mr-2" />
@@ -360,8 +398,80 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onBack, onEd
               )}
            </div>
         </div>
-
       </div>
+
+      {/* Escalation Modal */}
+      {showEscalationModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+            <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowEscalationModal(false)}></div>
+                <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+                <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
+                    <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <div className="flex justify-between items-center mb-4">
+                            <div className="flex items-center gap-2 text-red-600">
+                                <ShieldAlert className="h-6 w-6" />
+                                <h3 className="text-lg leading-6 font-bold text-gray-900">Escalate Ticket</h3>
+                            </div>
+                            <button onClick={() => setShowEscalationModal(false)} className="text-gray-400 hover:text-gray-500">
+                                <X className="h-6 w-6" />
+                            </button>
+                        </div>
+                        
+                        <form onSubmit={confirmEscalation} className="space-y-4">
+                            <div className="bg-red-50 border border-red-100 rounded-md p-3 text-sm text-red-800">
+                                Escalating this ticket will automatically set its priority to <strong>High</strong> and notify the assigned team member.
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Reason for Escalation <span className="text-red-500">*</span></label>
+                                <textarea
+                                    required
+                                    rows={3}
+                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                                    placeholder="Why is this ticket being escalated?"
+                                    value={escalationReason}
+                                    onChange={(e) => setEscalationReason(e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Reassign To (Optional)</label>
+                                <select
+                                    className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                                    value={escalationAssignee}
+                                    onChange={(e) => setEscalationAssignee(e.target.value)}
+                                >
+                                    <option value="">-- Keep Current Assignment --</option>
+                                    {employees.map((emp) => (
+                                        <option key={emp.id} value={emp.name}>
+                                            {emp.name} ({emp.role})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="mt-5 sm:mt-6 flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowEscalationModal(false)}
+                                    className="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:text-sm"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:text-sm"
+                                >
+                                    Confirm Escalation
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 };

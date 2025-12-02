@@ -575,6 +575,7 @@ export const App: React.FC = () => {
               onEdit={openEditTicketModal}
               onDelete={handleDeleteTicket}
               onCustomerClick={handleCustomerClick}
+              employees={employees}
             />
           );
         }
