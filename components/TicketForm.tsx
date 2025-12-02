@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Ticket, TicketStatus, TicketPriority, TicketCategory, Customer } from '../types';
-import { X, Save, User, Calendar } from 'lucide-react';
+import { Ticket, TicketStatus, TicketPriority, TicketCategory, Customer, Employee } from '../types';
+import { X, Save, User, Calendar, Briefcase } from 'lucide-react';
 
 interface TicketFormProps {
   isOpen: boolean;
@@ -10,6 +10,7 @@ interface TicketFormProps {
   initialData?: Partial<Ticket>;
   isLoading: boolean;
   customers: Customer[];
+  employees: Employee[];
 }
 
 export const TicketForm: React.FC<TicketFormProps> = ({ 
@@ -17,7 +18,8 @@ export const TicketForm: React.FC<TicketFormProps> = ({
   onClose, 
   onSubmit, 
   initialData, 
-  customers 
+  customers,
+  employees
 }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -153,14 +155,24 @@ export const TicketForm: React.FC<TicketFormProps> = ({
               <div className="grid grid-cols-2 gap-4">
                  <div>
                     <label htmlFor="assignedTo" className="block text-sm font-medium text-gray-700">Assigned To</label>
-                    <input
-                      type="text"
-                      id="assignedTo"
-                      className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md p-2 border"
-                      value={assignedTo}
-                      onChange={(e) => setAssignedTo(e.target.value)}
-                      placeholder="Agent Name"
-                    />
+                    <div className="relative mt-1">
+                      <select
+                        id="assignedTo"
+                        className="block w-full py-2 pl-3 pr-10 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                        value={assignedTo}
+                        onChange={(e) => setAssignedTo(e.target.value)}
+                      >
+                        <option value="">-- Unassigned --</option>
+                        {employees.map((emp) => (
+                          <option key={emp.id} value={emp.name}>
+                            {emp.name} ({emp.role})
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-8 pointer-events-none">
+                         <Briefcase className="h-4 w-4 text-gray-400" />
+                      </div>
+                    </div>
                  </div>
                  <div>
                     <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700">Due Date</label>

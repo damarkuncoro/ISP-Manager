@@ -753,6 +753,7 @@ export const App: React.FC = () => {
             initialData={editingTicket || undefined}
             isLoading={false}
             customers={customers}
+            employees={employees}
           />
         )}
 
