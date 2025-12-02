@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Copy, Check, Database, Server, ShieldCheck, Download, Globe } from 'lucide-react';
-import { SETUP_SQL, SUPABASE_URL } from '../constants';
+import { SETUP_SQL } from '../constants';
 import { AVAILABLE_CURRENCIES } from '../utils/formatters';
 
 interface SettingsViewProps {
@@ -55,7 +55,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     {connectionStatus === 'connected' ? 'Connected to Supabase' : 'Connection Failed'}
                 </span>
                 </div>
-                <p className="text-xs text-gray-400 mt-1 truncate">{SUPABASE_URL}</p>
+                <p className="text-xs text-gray-400 mt-1 truncate">{(import.meta as any).env?.VITE_SUPABASE_URL || 'Not configured'}</p>
             </div>
             
             <div>
