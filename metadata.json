@@ -1,0 +1,5 @@
+{
+  "name": "Nexus ISP Manager",
+  "description": "A comprehensive management system for Internet Service Providers. Manage subscriptions, track connection issues, handle billing inquiries, and monitor customer status.",
+  "requestFramePermissions": []
+}
