@@ -49,6 +49,19 @@ export enum DeviceType {
   OTHER = 'other',
 }
 
+export enum EmployeeRole {
+  ADMIN = 'admin',
+  MANAGER = 'manager',
+  SUPPORT = 'support',
+  TECHNICIAN = 'technician',
+}
+
+export enum EmployeeStatus {
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+  ON_LEAVE = 'on_leave',
+}
+
 export interface SubscriptionPlan {
   id: string;
   name: string;
@@ -70,6 +83,18 @@ export interface Customer {
   created_at: string;
 }
 
+export interface Employee {
+  id: string;
+  name: string;
+  email: string;
+  role: EmployeeRole;
+  status: EmployeeStatus;
+  phone?: string;
+  department?: string;
+  avatar_url?: string;
+  created_at: string;
+}
+
 export interface Ticket {
   id: string; 
   title: string;
@@ -80,7 +105,11 @@ export interface Ticket {
   created_at: string;
   customer_id?: string | null; 
   customer?: Customer;
-  is_escalated?: boolean; // New field for escalation
+  is_escalated?: boolean; 
+  // Enhanced fields
+  assigned_to?: string;
+  due_date?: string;
+  resolution_notes?: string;
 }
 
 export interface TicketComment {
@@ -99,7 +128,7 @@ export interface Invoice {
   status: InvoiceStatus;
   issued_date: string;
   due_date: string;
-  description?: string; // Added description
+  description?: string; 
   created_at: string;
 }
 
@@ -116,7 +145,7 @@ export interface PaymentMethod {
 
 export interface NetworkDevice {
   id: string;
-  customer_id?: string; // Linked to a customer (e.g. CPE)
+  customer_id?: string; 
   name: string;
   ip_address: string;
   type: DeviceType;
@@ -124,6 +153,10 @@ export interface NetworkDevice {
   location?: string;
   last_check: string;
   created_at: string;
+  // Technical Specs
+  model?: string;
+  serial_number?: string;
+  firmware_version?: string;
 }
 
 export type TicketStats = {

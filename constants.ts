@@ -1,5 +1,7 @@
 
 
+
+
 // Supabase Configuration
 // Note: In a production environment, these should be environment variables.
 // However, per the user's request and prompt context, they are included here for the generated app to function immediately.
@@ -18,6 +20,7 @@ DROP TABLE IF EXISTS public.network_devices CASCADE;
 DROP TABLE IF EXISTS public.tickets CASCADE;
 DROP TABLE IF EXISTS public.customers CASCADE;
 DROP TABLE IF EXISTS public.plans CASCADE;
+DROP TABLE IF EXISTS public.employees CASCADE;
 
 -- 1. Create Plans Table
 create table public.plans (
@@ -52,7 +55,10 @@ create table public.tickets (
   category text default 'internet_issue' not null check (category in ('internet_issue', 'billing', 'hardware', 'installation', 'other')),
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   customer_id uuid references public.customers(id) on delete set null,
-  is_escalated boolean default false
+  is_escalated boolean default false,
+  assigned_to text,
+  due_date timestamp with time zone,
+  resolution_notes text
 );
 
 -- 4. Create Invoices Table
@@ -99,10 +105,26 @@ create table public.network_devices (
   status text default 'online',
   location text,
   last_check timestamp with time zone default timezone('utc'::text, now()),
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  model text,
+  serial_number text,
+  firmware_version text
+);
+
+-- 8. Create Employees Table
+create table public.employees (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  email text not null,
+  role text default 'support' not null check (role in ('admin', 'manager', 'support', 'technician')),
+  status text default 'active' not null check (status in ('active', 'inactive', 'on_leave')),
+  phone text,
+  department text,
+  avatar_url text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- 8. Create Indexes (Optimization)
+-- 9. Create Indexes (Optimization)
 create index tickets_customer_id_idx on public.tickets(customer_id);
 create index customers_plan_id_idx on public.customers(plan_id);
 create index invoices_customer_id_idx on public.invoices(customer_id);
@@ -110,7 +132,7 @@ create index payment_methods_customer_id_idx on public.payment_methods(customer_
 create index ticket_comments_ticket_id_idx on public.ticket_comments(ticket_id);
 create index network_devices_customer_id_idx on public.network_devices(customer_id);
 
--- 9. Enable Row Level Security (RLS)
+-- 10. Enable Row Level Security (RLS)
 alter table public.customers enable row level security;
 alter table public.tickets enable row level security;
 alter table public.plans enable row level security;
@@ -118,8 +140,9 @@ alter table public.invoices enable row level security;
 alter table public.payment_methods enable row level security;
 alter table public.ticket_comments enable row level security;
 alter table public.network_devices enable row level security;
+alter table public.employees enable row level security;
 
--- 10. Create Public Access Policies (for demo)
+-- 11. Create Public Access Policies (for demo)
 create policy "Public Access Customers" on public.customers for all using (true);
 create policy "Public Access Tickets" on public.tickets for all using (true);
 create policy "Public Access Plans" on public.plans for all using (true);
@@ -127,9 +150,16 @@ create policy "Public Access Invoices" on public.invoices for all using (true);
 create policy "Public Access Payment Methods" on public.payment_methods for all using (true);
 create policy "Public Access Comments" on public.ticket_comments for all using (true);
 create policy "Public Access Network Devices" on public.network_devices for all using (true);
+create policy "Public Access Employees" on public.employees for all using (true);
 
--- 11. Seed Default Plans
+-- 12. Seed Default Plans and Admin
 insert into public.plans (name, price, download_speed, upload_speed) values 
 ('Home Fiber Starter', 29.99, '50 Mbps', '10 Mbps'),
 ('Home Fiber Plus', 49.99, '100 Mbps', '50 Mbps'),
-('Business Pro', 99.99, '1 Gbps', '1 Gbps');`;
+('Business Pro', 99.99, '1 Gbps', '1 Gbps');
+
+insert into public.employees (name, email, role, department, status) values 
+('Admin User', 'admin@nexus-isp.com', 'admin', 'Management', 'active'),
+('John Tech', 'john@nexus-isp.com', 'technician', 'Field Ops', 'active'),
+('Sarah Support', 'sarah@nexus-isp.com', 'support', 'Customer Service', 'active');
+`;

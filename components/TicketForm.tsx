@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { Ticket, TicketStatus, TicketPriority, TicketCategory, Customer } from '../types';
-import { X, Save, User } from 'lucide-react';
+import { X, Save, User, Calendar } from 'lucide-react';
 
 interface TicketFormProps {
   isOpen: boolean;
@@ -24,10 +25,15 @@ export const TicketForm: React.FC<TicketFormProps> = ({
   const [priority, setPriority] = useState<TicketPriority>(TicketPriority.MEDIUM);
   const [category, setCategory] = useState<TicketCategory>(TicketCategory.INTERNET);
   const [customerId, setCustomerId] = useState<string>('');
+  
+  // New Fields
+  const [assignedTo, setAssignedTo] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [resolutionNotes, setResolutionNotes] = useState('');
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Determine if we are editing an existing ticket or creating a new one
-  // If initialData has an ID, we are editing. If it just has defaults (like customer_id), we are creating.
   const isEditMode = !!(initialData && initialData.id);
 
   useEffect(() => {
@@ -38,6 +44,10 @@ export const TicketForm: React.FC<TicketFormProps> = ({
       setPriority(initialData.priority || TicketPriority.MEDIUM);
       setCategory(initialData.category || TicketCategory.INTERNET);
       setCustomerId(initialData.customer_id || '');
+      setAssignedTo(initialData.assigned_to || '');
+      // Format date for input[type="date"]
+      setDueDate(initialData.due_date ? new Date(initialData.due_date).toISOString().split('T')[0] : '');
+      setResolutionNotes(initialData.resolution_notes || '');
     } else {
       setTitle('');
       setDescription('');
@@ -45,6 +55,9 @@ export const TicketForm: React.FC<TicketFormProps> = ({
       setPriority(TicketPriority.MEDIUM);
       setCategory(TicketCategory.INTERNET);
       setCustomerId('');
+      setAssignedTo('');
+      setDueDate('');
+      setResolutionNotes('');
     }
   }, [initialData, isOpen]);
 
@@ -58,7 +71,10 @@ export const TicketForm: React.FC<TicketFormProps> = ({
         status, 
         priority,
         category,
-        customer_id: customerId === '' ? null : customerId
+        customer_id: customerId === '' ? null : customerId,
+        assigned_to: assignedTo || null,
+        due_date: dueDate ? new Date(dueDate).toISOString() : null,
+        resolution_notes: resolutionNotes || null
       });
     } finally {
       setIsSubmitting(false);
@@ -126,12 +142,41 @@ export const TicketForm: React.FC<TicketFormProps> = ({
                 <label htmlFor="description" className="block text-sm font-medium text-gray-700">Detailed Description</label>
                 <textarea
                   id="description"
-                  rows={4}
+                  rows={3}
                   className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md p-2 border"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Describe the problem, error lights on router, etc..."
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                 <div>
+                    <label htmlFor="assignedTo" className="block text-sm font-medium text-gray-700">Assigned To</label>
+                    <input
+                      type="text"
+                      id="assignedTo"
+                      className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md p-2 border"
+                      value={assignedTo}
+                      onChange={(e) => setAssignedTo(e.target.value)}
+                      placeholder="Agent Name"
+                    />
+                 </div>
+                 <div>
+                    <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700">Due Date</label>
+                    <div className="relative mt-1">
+                        <input
+                        type="date"
+                        id="dueDate"
+                        className="focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md p-2 border"
+                        value={dueDate}
+                        onChange={(e) => setDueDate(e.target.value)}
+                        />
+                         <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                            <Calendar className="h-4 w-4 text-gray-400" />
+                         </div>
+                    </div>
+                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -164,9 +209,10 @@ export const TicketForm: React.FC<TicketFormProps> = ({
                     <option value={TicketStatus.CLOSED}>Closed</option>
                   </select>
                 </div>
-
-                <div className="col-span-2">
-                  <label htmlFor="priority" className="block text-sm font-medium text-gray-700">Priority</label>
+              </div>
+              
+              <div>
+                 <label htmlFor="priority" className="block text-sm font-medium text-gray-700">Priority</label>
                   <select
                     id="priority"
                     className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
@@ -177,8 +223,25 @@ export const TicketForm: React.FC<TicketFormProps> = ({
                     <option value={TicketPriority.MEDIUM}>Medium</option>
                     <option value={TicketPriority.HIGH}>High</option>
                   </select>
-                </div>
               </div>
+
+              {/* Only show resolution notes if ticket is closed or user wants to close it */}
+              {(status === TicketStatus.CLOSED || isEditMode) && (
+                  <div className={`transition-all duration-300 ${status === TicketStatus.CLOSED ? 'opacity-100' : 'opacity-70'}`}>
+                      <label htmlFor="resolution" className="block text-sm font-medium text-gray-700 flex justify-between">
+                          Resolution Notes
+                          {status !== TicketStatus.CLOSED && <span className="text-xs text-gray-400 font-normal">(Visible when closed)</span>}
+                      </label>
+                      <textarea
+                        id="resolution"
+                        rows={3}
+                        className="mt-1 focus:ring-green-500 focus:border-green-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md p-2 border"
+                        value={resolutionNotes}
+                        onChange={(e) => setResolutionNotes(e.target.value)}
+                        placeholder="Explain how the issue was resolved..."
+                      />
+                  </div>
+              )}
 
               <div className="mt-5 sm:mt-6 flex gap-3 justify-end">
                 <button

@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { NetworkDevice, DeviceType, DeviceStatus } from '../types';
-import { X, Save, Server } from 'lucide-react';
+import { X, Save, Server, Cpu, Hash, Activity } from 'lucide-react';
 
 interface DeviceFormProps {
   isOpen: boolean;
@@ -16,6 +17,12 @@ export const DeviceForm: React.FC<DeviceFormProps> = ({ isOpen, onClose, onSubmi
   const [type, setType] = useState<DeviceType>(DeviceType.ROUTER);
   const [status, setStatus] = useState<DeviceStatus>(DeviceStatus.ONLINE);
   const [location, setLocation] = useState('');
+  
+  // Technical Specs
+  const [model, setModel] = useState('');
+  const [serialNumber, setSerialNumber] = useState('');
+  const [firmwareVersion, setFirmwareVersion] = useState('');
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -25,12 +32,19 @@ export const DeviceForm: React.FC<DeviceFormProps> = ({ isOpen, onClose, onSubmi
       setType(initialData.type);
       setStatus(initialData.status);
       setLocation(initialData.location || '');
+      // Tech Specs
+      setModel(initialData.model || '');
+      setSerialNumber(initialData.serial_number || '');
+      setFirmwareVersion(initialData.firmware_version || '');
     } else {
       setName('');
       setIpAddress('');
       setType(customerId ? DeviceType.CPE : DeviceType.ROUTER); // Default to CPE if adding for a customer
       setStatus(DeviceStatus.ONLINE);
       setLocation(customerId ? 'Customer Premises' : '');
+      setModel('');
+      setSerialNumber('');
+      setFirmwareVersion('');
     }
   }, [initialData, isOpen, customerId]);
 
@@ -44,6 +58,9 @@ export const DeviceForm: React.FC<DeviceFormProps> = ({ isOpen, onClose, onSubmi
         type,
         status,
         location,
+        model,
+        serial_number: serialNumber,
+        firmware_version: firmwareVersion,
         customer_id: customerId // Include customer ID in submission
       });
       onClose();
@@ -142,6 +159,45 @@ export const DeviceForm: React.FC<DeviceFormProps> = ({ isOpen, onClose, onSubmi
                   value={location}
                   onChange={e => setLocation(e.target.value)}
                 />
+              </div>
+
+              <div className="border-t border-gray-100 pt-4 mt-2">
+                 <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
+                    <Cpu className="w-4 h-4 text-gray-500" />
+                    Technical Specifications
+                 </h4>
+                 <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Model</label>
+                        <input
+                            type="text"
+                            className="focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-xs border-gray-300 rounded-md border p-2"
+                            placeholder="e.g. MikroTik RB4011"
+                            value={model}
+                            onChange={e => setModel(e.target.value)}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Serial Number</label>
+                        <input
+                            type="text"
+                            className="focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-xs border-gray-300 rounded-md border p-2"
+                            placeholder="e.g. SN-12345678"
+                            value={serialNumber}
+                            onChange={e => setSerialNumber(e.target.value)}
+                        />
+                    </div>
+                    <div className="col-span-2">
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Firmware Version</label>
+                        <input
+                            type="text"
+                            className="focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-xs border-gray-300 rounded-md border p-2"
+                            placeholder="e.g. v6.48.6 (Long-term)"
+                            value={firmwareVersion}
+                            onChange={e => setFirmwareVersion(e.target.value)}
+                        />
+                    </div>
+                 </div>
               </div>
 
               <div className="mt-5 sm:mt-6 flex gap-3 justify-end">

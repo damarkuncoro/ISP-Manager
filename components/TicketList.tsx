@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Ticket, TicketStatus, TicketPriority, TicketCategory } from '../types';
 import { Search, Filter, MoreHorizontal, Clock, AlertCircle, CheckCircle2, User, Wifi, CreditCard, Router, Wrench, HelpCircle, ChevronRight, AlertTriangle } from 'lucide-react';
@@ -76,7 +77,8 @@ export const TicketList: React.FC<TicketListProps> = ({ tickets, onEdit, onDelet
     return tickets.filter(ticket => {
       const matchesSearch = ticket.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
                             ticket.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            ticket.customer?.name.toLowerCase().includes(searchTerm.toLowerCase());
+                            ticket.customer?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            ticket.assigned_to?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'all' || ticket.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
@@ -105,7 +107,7 @@ export const TicketList: React.FC<TicketListProps> = ({ tickets, onEdit, onDelet
             <input
               type="text"
               className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 sm:text-sm transition duration-150 ease-in-out"
-              placeholder="Search tickets or subscribers..."
+              placeholder="Search tickets, subscribers, or agents..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -127,7 +129,10 @@ export const TicketList: React.FC<TicketListProps> = ({ tickets, onEdit, onDelet
       )}
 
       <ul className="divide-y divide-gray-100">
-        {filteredTickets.map((ticket) => (
+        {filteredTickets.map((ticket) => {
+            const isOverdue = ticket.due_date && new Date(ticket.due_date) < new Date() && ticket.status !== TicketStatus.CLOSED;
+
+            return (
           <li 
             key={ticket.id} 
             className={`hover:bg-gray-50 transition-colors duration-150 group ${onTicketClick ? 'cursor-pointer' : ''}`}
@@ -142,6 +147,9 @@ export const TicketList: React.FC<TicketListProps> = ({ tickets, onEdit, onDelet
                     </p>
                     {ticket.is_escalated && (
                         <AlertTriangle className="w-4 h-4 text-red-500" />
+                    )}
+                    {isOverdue && (
+                        <span className="text-[10px] font-bold bg-red-100 text-red-700 px-1.5 py-0.5 rounded border border-red-200">OVERDUE</span>
                     )}
                     {ticket.category && <CategoryBadge category={ticket.category} />}
                     {ticket.customer && (
@@ -181,6 +189,12 @@ export const TicketList: React.FC<TicketListProps> = ({ tickets, onEdit, onDelet
                        <Clock className="w-3 h-3" />
                        {new Date(ticket.created_at).toLocaleDateString()}
                     </span>
+                    {ticket.assigned_to && (
+                        <span className="flex items-center gap-1 text-xs text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                            <User className="w-3 h-3" />
+                            {ticket.assigned_to}
+                        </span>
+                    )}
                   </div>
                 )}
               </div>
@@ -226,7 +240,7 @@ export const TicketList: React.FC<TicketListProps> = ({ tickets, onEdit, onDelet
               )}
             </div>
           </li>
-        ))}
+        )})}
         {filteredTickets.length === 0 && (
             <li className="px-4 py-8 text-center text-gray-500 text-sm">
                 No tickets found matching your filters.

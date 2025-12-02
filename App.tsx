@@ -13,19 +13,28 @@ import { PlanDetail } from './components/PlanDetail';
 import { PlanForm } from './components/PlanForm';
 import { NetworkView } from './components/NetworkView';
 import { DeviceForm } from './components/DeviceForm';
+import { EmployeeList } from './components/EmployeeList';
+import { EmployeeForm } from './components/EmployeeForm';
+import { EmployeeDetail } from './components/EmployeeDetail';
 import { SettingsView } from './components/SettingsView';
-import { Ticket, Customer, SubscriptionPlan, NetworkDevice } from './types';
+import { AccessDenied } from './components/AccessDenied';
+import { Ticket, Customer, SubscriptionPlan, NetworkDevice, Employee } from './types';
 import { AlertCircle, Plus, Loader2, Database, Copy, Check } from 'lucide-react';
 import { SETUP_SQL } from './constants';
 import { useTickets } from './hooks/useTickets';
 import { useCustomers } from './hooks/useCustomers';
 import { usePlans } from './hooks/usePlans';
 import { useDevices } from './hooks/useDevices';
+import { useEmployees } from './hooks/useEmployees';
+import { useAuth } from './contexts/AuthContext';
 import { getSafeErrorMessage, isSetupError } from './utils/errorHelpers';
 
 export const App: React.FC = () => {
-  const [view, setView] = useState<'dashboard' | 'tickets' | 'customers' | 'plans' | 'network' | 'settings'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'tickets' | 'customers' | 'plans' | 'network' | 'settings' | 'employees'>('dashboard');
   
+  // Auth Context
+  const { hasPermission, currentUser } = useAuth();
+
   // Global Settings State
   const [currency, setCurrency] = useState<string>('USD');
 
@@ -66,8 +75,17 @@ export const App: React.FC = () => {
     removeDevice
   } = useDevices();
 
+  const {
+    employees,
+    loading: employeesLoading,
+    loadEmployees,
+    addEmployee,
+    editEmployee,
+    removeEmployee
+  } = useEmployees();
+
   // Aggregate State
-  const loading = ticketsLoading || customersLoading || plansLoading || devicesLoading;
+  const loading = ticketsLoading || customersLoading || plansLoading || devicesLoading || employeesLoading;
   const globalError = ticketsError || customersError;
   const [setupError, setSetupError] = useState(false);
 
@@ -76,10 +94,12 @@ export const App: React.FC = () => {
   const [isCustomerFormOpen, setIsCustomerFormOpen] = useState(false);
   const [isPlanFormOpen, setIsPlanFormOpen] = useState(false);
   const [isDeviceFormOpen, setIsDeviceFormOpen] = useState(false);
+  const [isEmployeeFormOpen, setIsEmployeeFormOpen] = useState(false);
   
   const [editingTicket, setEditingTicket] = useState<Partial<Ticket> | null>(null);
   const [editingPlan, setEditingPlan] = useState<SubscriptionPlan | null>(null);
   const [editingDevice, setEditingDevice] = useState<NetworkDevice | null>(null);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [deviceCustomerId, setDeviceCustomerId] = useState<string | undefined>(undefined);
   
   const [copied, setCopied] = useState(false);
@@ -88,6 +108,8 @@ export const App: React.FC = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+
   const [customerSearch, setCustomerSearch] = useState(''); 
   const [previousView, setPreviousView] = useState<typeof view | null>(null); // Track navigation history
 
@@ -108,11 +130,11 @@ export const App: React.FC = () => {
   const loadData = useCallback(async () => {
     setSetupError(false);
     try {
-      await Promise.all([loadTickets(), loadCustomers(), loadPlans(), loadDevices()]);
+      await Promise.all([loadTickets(), loadCustomers(), loadPlans(), loadDevices(), loadEmployees()]);
     } catch (err) {
       console.error("Data load failed via hooks");
     }
-  }, [loadTickets, loadCustomers, loadPlans, loadDevices]);
+  }, [loadTickets, loadCustomers, loadPlans, loadDevices, loadEmployees]);
 
   useEffect(() => {
     loadData();
@@ -139,6 +161,9 @@ export const App: React.FC = () => {
     }
     if (newView !== 'tickets') {
       setSelectedTicket(null);
+    }
+    if (newView !== 'employees') {
+      setSelectedEmployee(null);
     }
   };
 
@@ -190,6 +215,10 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteTicket = async (id: string) => {
+    if (!hasPermission('delete_records')) {
+      alert("You do not have permission to delete tickets.");
+      return;
+    }
     if (!window.confirm("Are you sure you want to delete this ticket?")) return;
     try {
       await removeTicket(id);
@@ -232,6 +261,10 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteCustomer = async (id: string) => {
+    if (!hasPermission('delete_records')) {
+      alert("You do not have permission to delete customers.");
+      return;
+    }
     if (!window.confirm("Are you sure? This will delete the customer and might affect linked tickets.")) return;
     try {
       await removeCustomer(id);
@@ -256,6 +289,10 @@ export const App: React.FC = () => {
   };
 
   const handleDeletePlan = async (id: string) => {
+      if (!hasPermission('delete_records')) {
+        alert("You do not have permission to delete plans.");
+        return;
+      }
       if (!window.confirm("Delete this plan? Customers on this plan will keep their data but lose the link.")) return;
       try {
           await removePlan(id);
@@ -270,6 +307,10 @@ export const App: React.FC = () => {
   // --- Device Handlers ---
 
   const handleCreateDevice = async (deviceData: Omit<NetworkDevice, 'id' | 'created_at' | 'last_check'>) => {
+    if (!hasPermission('manage_network')) {
+       alert("You do not have permission to add network devices.");
+       return;
+    }
     try {
       await addDevice(deviceData);
       setIsDeviceFormOpen(false);
@@ -280,6 +321,10 @@ export const App: React.FC = () => {
   };
 
   const handleUpdateDevice = async (deviceData: any) => {
+    if (!hasPermission('manage_network')) {
+        alert("You do not have permission to edit network devices.");
+        return;
+    }
     if (!editingDevice) return;
     try {
       await editDevice(editingDevice.id, deviceData);
@@ -292,6 +337,10 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteDevice = async (id: string) => {
+    if (!hasPermission('manage_network')) {
+        alert("You do not have permission to delete network devices.");
+        return;
+    }
     if (!window.confirm("Are you sure you want to delete this device?")) return;
     try {
       await removeDevice(id);
@@ -304,6 +353,44 @@ export const App: React.FC = () => {
       setDeviceCustomerId(customerId);
       setEditingDevice(null);
       setIsDeviceFormOpen(true);
+  };
+
+  // --- Employee Handlers ---
+
+  const handleCreateEmployee = async (employeeData: Omit<Employee, 'id' | 'created_at'>) => {
+    try {
+      await addEmployee(employeeData);
+      setIsEmployeeFormOpen(false);
+    } catch (err) {
+      alert("Failed to create employee: " + getSafeErrorMessage(err));
+    }
+  };
+
+  const handleUpdateEmployee = async (employeeData: any) => {
+    if (!editingEmployee) return;
+    try {
+      await editEmployee(editingEmployee.id, employeeData);
+      setIsEmployeeFormOpen(false);
+      setEditingEmployee(null);
+      // Update selected employee view if open
+      if (selectedEmployee && selectedEmployee.id === editingEmployee.id) {
+          setSelectedEmployee({...selectedEmployee, ...employeeData});
+      }
+    } catch (err) {
+      alert("Failed to update employee: " + getSafeErrorMessage(err));
+    }
+  };
+
+  const handleDeleteEmployee = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this team member?")) return;
+    try {
+      await removeEmployee(id);
+      if (selectedEmployee?.id === id) {
+          setSelectedEmployee(null);
+      }
+    } catch (err) {
+      alert("Failed to delete employee.");
+    }
   };
 
   const handleCopySQL = () => {
@@ -320,6 +407,7 @@ export const App: React.FC = () => {
       case 'network': return 'Network Infrastructure';
       case 'settings': return 'System Settings';
       case 'tickets': return selectedTicket ? 'Ticket Details' : 'Ticket Management';
+      case 'employees': return selectedEmployee ? 'Team Member Profile' : 'Team Management';
       default: return 'Nexus ISP Manager';
     }
   };
@@ -332,12 +420,21 @@ export const App: React.FC = () => {
       case 'network': return 'Monitor routers, switches, OLTs and link status.';
       case 'settings': return 'Configure database connections and system parameters.';
       case 'tickets': return selectedTicket ? 'View full ticket history and information.' : 'Manage, track, and resolve support tickets.';
+      case 'employees': return selectedEmployee ? 'View employee details and assigned tasks.' : 'Manage support agents, technicians, and administrators.';
       default: return 'Manage, track, and resolve support tickets.';
     }
   };
 
   // Determine which component to render
   const renderContent = () => {
+    // Role-Based Access Control Checks
+    if (view === 'settings' && !hasPermission('manage_settings')) {
+        return <AccessDenied onBack={() => setView('dashboard')} requiredRole="Admin" />;
+    }
+    if (view === 'employees' && !hasPermission('manage_team')) {
+        return <AccessDenied onBack={() => setView('dashboard')} requiredRole="Admin or Manager" />;
+    }
+
     if (view === 'settings') {
       return (
         <SettingsView 
@@ -397,13 +494,15 @@ export const App: React.FC = () => {
                             I've created the tables, Refresh
                           </button>
                           
-                          <button
-                            type="button"
-                            onClick={() => setView('settings')}
-                            className="inline-flex items-center px-4 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
-                          >
-                             Go to Settings
-                          </button>
+                          {hasPermission('manage_settings') && (
+                              <button
+                                type="button"
+                                onClick={() => setView('settings')}
+                                className="inline-flex items-center px-4 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
+                              >
+                                Go to Settings
+                              </button>
+                          )}
                       </div>
                    </div>
                 ) : (
@@ -568,9 +667,48 @@ export const App: React.FC = () => {
                 onRefresh={loadDevices}
               />
           );
+      case 'employees':
+          if (selectedEmployee) {
+              return (
+                  <EmployeeDetail 
+                    employee={selectedEmployee}
+                    assignedTickets={tickets.filter(t => t.assigned_to === selectedEmployee.name)}
+                    onBack={() => setSelectedEmployee(null)}
+                    onEdit={(emp) => {
+                        setEditingEmployee(emp);
+                        setIsEmployeeFormOpen(true);
+                    }}
+                    onDelete={handleDeleteEmployee}
+                    onTicketClick={handleTicketClick}
+                  />
+              );
+          }
+          return (
+              <div className="animate-in slide-in-from-right-4 duration-500">
+                  <EmployeeList 
+                      employees={employees}
+                      onEdit={(emp) => {
+                          setEditingEmployee(emp);
+                          setIsEmployeeFormOpen(true);
+                      }}
+                      onDelete={handleDeleteEmployee}
+                      onSelect={setSelectedEmployee}
+                  />
+              </div>
+          );
       default:
         return null;
     }
+  };
+
+  const shouldShowAddButton = () => {
+    if (view === 'dashboard' || view === 'network' || globalError || selectedCustomer || selectedPlan || selectedTicket || selectedEmployee) return false;
+    
+    // Add permission checks
+    if (view === 'settings') return false; 
+    if (view === 'employees' && !hasPermission('manage_team')) return false;
+
+    return true;
   };
 
   return (
@@ -588,17 +726,18 @@ export const App: React.FC = () => {
             </p>
           </div>
           
-          {view !== 'settings' && view !== 'dashboard' && view !== 'network' && !globalError && !selectedCustomer && !selectedPlan && !selectedTicket && (
+          {shouldShowAddButton() && (
             <button
               onClick={() => {
                   if (view === 'customers') setIsCustomerFormOpen(true);
                   else if (view === 'plans') { setEditingPlan(null); setIsPlanFormOpen(true); }
+                  else if (view === 'employees') { setEditingEmployee(null); setIsEmployeeFormOpen(true); }
                   else openCreateTicketModal();
               }}
               className="inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg shadow-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
             >
               <Plus className="w-5 h-5 mr-2" />
-              {view === 'customers' ? 'New Customer' : view === 'plans' ? 'New Plan' : 'New Ticket'}
+              {view === 'customers' ? 'New Customer' : view === 'plans' ? 'New Plan' : view === 'employees' ? 'New Member' : 'New Ticket'}
             </button>
           )}
         </div>
@@ -647,6 +786,16 @@ export const App: React.FC = () => {
                 onSubmit={editingDevice ? handleUpdateDevice : handleCreateDevice}
                 initialData={editingDevice || undefined}
                 customerId={deviceCustomerId}
+            />
+        )}
+        
+        {/* Create/Edit Employee Modal */}
+        {isEmployeeFormOpen && (
+            <EmployeeForm
+                isOpen={isEmployeeFormOpen}
+                onClose={() => setIsEmployeeFormOpen(false)}
+                onSubmit={editingEmployee ? handleUpdateEmployee : handleCreateEmployee}
+                initialData={editingEmployee || undefined}
             />
         )}
 

@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { Ticket, TicketStatus, TicketPriority, TicketCategory } from '../types';
-import { ArrowLeft, Edit2, Trash2, User, MapPin, Calendar, Clock, CheckCircle2, AlertCircle, Wifi, CreditCard, Router, Wrench, HelpCircle, FileText, Activity, Send, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Edit2, Trash2, User, MapPin, Calendar, Clock, CheckCircle2, AlertCircle, Wifi, CreditCard, Router, Wrench, HelpCircle, FileText, Activity, Send, AlertTriangle, CheckSquare } from 'lucide-react';
 import { useComments } from '../hooks/useComments';
 
 interface TicketDetailProps {
@@ -88,15 +89,13 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onBack, onEd
   };
 
   const handleEscalate = async () => {
-    // In a real app, this would call an API. 
-    // Since we are mocking the interaction here via the `onEdit` or `useTickets` (not passed directly here),
-    // we will simulate the behavior or assume `onEdit` can handle partial updates if we passed the right structure.
-    // For now, let's open the edit modal with a high priority suggestion, or use a comment.
     if(window.confirm("Escalate this ticket to Tier 2 Support?")) {
         await addComment("SYSTEM: Ticket escalated to Tier 2 due to critical impact.", "System");
         onEdit({...ticket, is_escalated: true, priority: TicketPriority.HIGH});
     }
   };
+  
+  const isOverdue = ticket.due_date && new Date(ticket.due_date) < new Date() && ticket.status !== TicketStatus.CLOSED;
 
   return (
     <div className="space-y-6 animate-in slide-in-from-right-4 duration-500">
@@ -132,7 +131,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onBack, onEd
         </div>
         
         <div className="flex flex-wrap gap-2 self-end sm:self-start">
-           {!ticket.is_escalated && (
+           {!ticket.is_escalated && ticket.status !== TicketStatus.CLOSED && (
                <button 
                 onClick={handleEscalate}
                 className="inline-flex items-center px-4 py-2 border border-red-200 shadow-sm text-sm font-medium rounded-lg text-red-700 bg-red-50 hover:bg-red-100 transition-colors"
@@ -180,6 +179,23 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onBack, onEd
                  </div>
               </div>
            </div>
+
+           {/* Resolution (Visible if Closed) */}
+           {ticket.status === TicketStatus.CLOSED && (
+               <div className="bg-green-50 rounded-xl shadow-sm border border-green-200 overflow-hidden">
+                   <div className="px-6 py-4 border-b border-green-100 flex items-center gap-2">
+                        <CheckSquare className="w-5 h-5 text-green-700" />
+                        <h3 className="text-lg font-medium text-green-800">Resolution</h3>
+                   </div>
+                   <div className="p-6 text-green-900">
+                        {ticket.resolution_notes ? (
+                            <p className="whitespace-pre-wrap">{ticket.resolution_notes}</p>
+                        ) : (
+                            <p className="italic text-green-700">No resolution notes recorded.</p>
+                        )}
+                   </div>
+               </div>
+           )}
 
            {/* Updates & Comments */}
            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -256,8 +272,47 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onBack, onEd
            </div>
         </div>
 
-        {/* Sidebar: Customer & Info */}
+        {/* Sidebar: Metadata & Info */}
         <div className="space-y-6">
+           {/* Assignment & SLA */}
+           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+               <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+                    <h3 className="text-lg font-medium text-gray-900">Ticket Info</h3>
+               </div>
+               <div className="p-4 space-y-4">
+                   {/* Assigned To */}
+                   <div>
+                       <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Agent</span>
+                       <div className="mt-1 flex items-center gap-2">
+                           <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${ticket.assigned_to ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-400'}`}>
+                               {ticket.assigned_to ? ticket.assigned_to.charAt(0) : '?'}
+                           </div>
+                           <p className={`text-sm font-medium ${ticket.assigned_to ? 'text-gray-900' : 'text-gray-500 italic'}`}>
+                               {ticket.assigned_to || 'Unassigned'}
+                           </p>
+                       </div>
+                   </div>
+                   
+                   {/* Due Date */}
+                   <div>
+                       <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date (SLA)</span>
+                       <div className="mt-1 flex items-center gap-2">
+                           <Clock className={`w-4 h-4 ${isOverdue ? 'text-red-500' : 'text-gray-400'}`} />
+                           <p className={`text-sm font-medium ${isOverdue ? 'text-red-600 font-bold' : ticket.due_date ? 'text-gray-900' : 'text-gray-500 italic'}`}>
+                               {ticket.due_date ? new Date(ticket.due_date).toLocaleDateString() : 'No Deadline'}
+                           </p>
+                           {isOverdue && <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-bold">OVERDUE</span>}
+                       </div>
+                   </div>
+
+                   {/* Category */}
+                   <div>
+                     <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Category</span>
+                     <p className="mt-1 text-sm font-medium text-gray-900 capitalize">{ticket.category.replace('_', ' ')}</p>
+                  </div>
+               </div>
+           </div>
+
            {/* Customer Card */}
            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
@@ -303,20 +358,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onBack, onEd
                    No customer linked to this ticket.
                 </div>
               )}
-           </div>
-
-           {/* Ticket Metadata */}
-           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-               <div className="p-4 space-y-4">
-                  <div>
-                     <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Category</span>
-                     <p className="mt-1 text-sm font-medium text-gray-900 capitalize">{ticket.category.replace('_', ' ')}</p>
-                  </div>
-                  <div>
-                     <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Last Updated</span>
-                     <p className="mt-1 text-sm font-medium text-gray-900">{new Date(ticket.created_at).toLocaleString()}</p>
-                  </div>
-               </div>
            </div>
         </div>
 

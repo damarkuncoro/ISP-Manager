@@ -1,6 +1,8 @@
+
 import React, { ReactNode } from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './App';
+import { AuthProvider } from './contexts/AuthContext';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -61,7 +63,9 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <ErrorBoundary>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </ErrorBoundary>
   </React.StrictMode>
 );
