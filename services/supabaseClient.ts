@@ -1,9 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../constants';
 
-const envUrl = (import.meta as any).env.VITE_SUPABASE_URL as string | undefined;
-const envKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY as string | undefined;
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error("Supabase URL or Key is missing!");
+}
 
-const url = envUrl || '';
-const key = envKey || '';
-
-export const supabase = createClient(url, key);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
