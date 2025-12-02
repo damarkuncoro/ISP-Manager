@@ -1,6 +1,7 @@
+
 import { useState, useCallback } from 'react';
 import { Invoice, PaymentMethod, InvoiceStatus } from '../types';
-import { fetchInvoices, fetchPaymentMethods, generateInvoice, addPaymentMethod } from '../services/billingService';
+import { fetchInvoices, fetchPaymentMethods, generateInvoice, addPaymentMethod, updateInvoiceStatus } from '../services/billingService';
 import { getSafeErrorMessage } from '../utils/errorHelpers';
 
 export const useBilling = (customerId: string) => {
@@ -29,7 +30,7 @@ export const useBilling = (customerId: string) => {
     }
   }, [customerId]);
 
-  const createNewInvoice = async (amount: number, dueDate: Date) => {
+  const createNewInvoice = async (amount: number, dueDate: Date, description?: string) => {
     try {
       const invoiceNum = `INV-${Date.now().toString().slice(-6)}`;
       const newInvoice = await generateInvoice({
@@ -39,9 +40,20 @@ export const useBilling = (customerId: string) => {
         status: InvoiceStatus.PENDING,
         issued_date: new Date().toISOString(),
         due_date: dueDate.toISOString(),
+        description: description || 'General Service',
       });
       setInvoices(prev => [newInvoice, ...prev]);
       return newInvoice;
+    } catch (err) {
+      throw new Error(getSafeErrorMessage(err));
+    }
+  };
+
+  const updateStatus = async (id: string, status: InvoiceStatus) => {
+    try {
+      const updated = await updateInvoiceStatus(id, status);
+      setInvoices(prev => prev.map(inv => inv.id === id ? updated : inv));
+      return updated;
     } catch (err) {
       throw new Error(getSafeErrorMessage(err));
     }
@@ -82,6 +94,7 @@ export const useBilling = (customerId: string) => {
     error,
     loadBillingData,
     createNewInvoice,
+    updateStatus,
     addMethod
   };
 };

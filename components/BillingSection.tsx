@@ -1,12 +1,14 @@
+
 import React, { useEffect, useState } from 'react';
-import { Customer, Invoice, InvoiceStatus, PaymentMethod } from '../types';
+import { Customer, Invoice, InvoiceStatus, PaymentMethod, SubscriptionPlan } from '../types';
 import { useBilling } from '../hooks/useBilling';
 import { formatCurrency } from '../utils/formatters';
-import { FileText, CreditCard, Plus, Download, AlertCircle, CheckCircle2, Clock, Landmark, X } from 'lucide-react';
+import { FileText, CreditCard, Plus, Download, AlertCircle, CheckCircle2, Clock, Landmark, X, MoreVertical } from 'lucide-react';
 
 interface BillingSectionProps {
   customer: Customer;
   currency: string;
+  plans: SubscriptionPlan[];
 }
 
 const InvoiceStatusBadge = ({ status }: { status: InvoiceStatus }) => {
@@ -34,13 +36,14 @@ const InvoiceStatusBadge = ({ status }: { status: InvoiceStatus }) => {
   );
 };
 
-export const BillingSection: React.FC<BillingSectionProps> = ({ customer, currency }) => {
+export const BillingSection: React.FC<BillingSectionProps> = ({ customer, currency, plans }) => {
   const { 
     invoices, 
     paymentMethods, 
     loading, 
     loadBillingData, 
     createNewInvoice,
+    updateStatus,
     addMethod 
   } = useBilling(customer.id);
 
@@ -58,19 +61,33 @@ export const BillingSection: React.FC<BillingSectionProps> = ({ customer, curren
   }, [loadBillingData]);
 
   const handleGenerateInvoice = async () => {
-    // This is a mock generator for demo purposes
-    // In a real app, this would calculate based on the plan
-    const amount = 49.99; // Default mock amount
+    // Find the current plan details to relate billing accurately
+    const currentPlan = plans.find(p => p.id === customer.plan_id);
+    
+    // Fallback if no plan found (adhoc)
+    const amount = currentPlan ? currentPlan.price : 0;
+    const description = currentPlan 
+        ? `Monthly Subscription: ${currentPlan.name}` 
+        : 'Ad-hoc Service Charge';
+        
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 14); // Due in 2 weeks
     
     setIsGenerating(true);
     try {
-      await createNewInvoice(amount, dueDate);
+      await createNewInvoice(amount, dueDate, description);
     } catch (e) {
       alert("Failed to generate invoice");
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleUpdateStatus = async (id: string, newStatus: InvoiceStatus) => {
+    try {
+      await updateStatus(id, newStatus);
+    } catch (e) {
+      alert("Failed to update invoice status");
     }
   };
 
@@ -143,32 +160,33 @@ export const BillingSection: React.FC<BillingSectionProps> = ({ customer, curren
               className="text-sm flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium"
             >
               <Plus className="w-4 h-4" />
-              {isGenerating ? 'Generating...' : 'Generate Invoice'}
+              {isGenerating ? 'Generating...' : 'Generate New Invoice'}
             </button>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice #</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {invoices.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-500">
-                      No invoices found.
+                      No invoices found. Generate one to get started.
                     </td>
                   </tr>
                 ) : (
                   invoices.map((inv) => (
-                    <tr key={inv.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {inv.invoice_number}
+                    <tr key={inv.id} className="hover:bg-gray-50 transition-colors group">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{inv.invoice_number}</div>
+                        <div className="text-xs text-gray-500 truncate max-w-[150px]">{inv.description || 'General Service'}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(inv.issued_date).toLocaleDateString()}
@@ -181,9 +199,24 @@ export const BillingSection: React.FC<BillingSectionProps> = ({ customer, curren
                         <InvoiceStatusBadge status={inv.status} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button className="text-gray-400 hover:text-gray-600">
-                          <Download className="w-4 h-4" />
-                        </button>
+                         <div className="flex justify-end gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                            {inv.status === InvoiceStatus.PENDING || inv.status === InvoiceStatus.OVERDUE ? (
+                                <button 
+                                    onClick={() => handleUpdateStatus(inv.id, InvoiceStatus.PAID)}
+                                    className="text-xs bg-green-50 text-green-600 hover:bg-green-100 px-2 py-1 rounded"
+                                >
+                                    Mark Paid
+                                </button>
+                            ) : null}
+                            {inv.status !== InvoiceStatus.CANCELLED && inv.status !== InvoiceStatus.PAID && (
+                                <button 
+                                    onClick={() => handleUpdateStatus(inv.id, InvoiceStatus.CANCELLED)}
+                                    className="text-xs bg-gray-50 text-gray-500 hover:bg-gray-100 px-2 py-1 rounded"
+                                >
+                                    Cancel
+                                </button>
+                            )}
+                         </div>
                       </td>
                     </tr>
                   ))

@@ -1,3 +1,4 @@
+
 export enum TicketStatus {
   OPEN = 'open',
   IN_PROGRESS = 'in_progress',
@@ -98,6 +99,7 @@ export interface Invoice {
   status: InvoiceStatus;
   issued_date: string;
   due_date: string;
+  description?: string; // Added description
   created_at: string;
 }
 

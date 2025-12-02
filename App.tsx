@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Layout } from './components/Layout';
 import { StatsOverview } from './components/StatsOverview';
@@ -510,6 +511,7 @@ export const App: React.FC = () => {
                     setIsDeviceFormOpen(true);
                 }}
                 onDeleteDevice={handleDeleteDevice}
+                plans={plans} // Pass plans for billing relation
               />
            )
         }

@@ -64,6 +64,7 @@ create table public.invoices (
   status text default 'pending' not null check (status in ('paid', 'pending', 'overdue', 'cancelled')),
   issued_date date default CURRENT_DATE not null,
   due_date date not null,
+  description text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 

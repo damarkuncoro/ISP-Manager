@@ -1,3 +1,4 @@
+
 import { supabase } from './supabaseClient';
 import { Invoice, PaymentMethod, InvoiceStatus } from '../types';
 
@@ -33,6 +34,18 @@ export const generateInvoice = async (invoice: Omit<Invoice, 'id' | 'created_at'
   const { data, error } = await supabase
     .from('invoices')
     .insert([invoice])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as Invoice;
+};
+
+export const updateInvoiceStatus = async (id: string, status: InvoiceStatus): Promise<Invoice> => {
+  const { data, error } = await supabase
+    .from('invoices')
+    .update({ status })
+    .eq('id', id)
     .select()
     .single();
 

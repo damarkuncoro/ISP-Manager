@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { Customer, Ticket, CustomerStatus, NetworkDevice } from '../types';
+import { Customer, Ticket, CustomerStatus, NetworkDevice, SubscriptionPlan } from '../types';
 import { ArrowLeft, Mail, Building, MapPin, Wifi, Calendar, Shield, CreditCard, LayoutDashboard, Plus, Router } from 'lucide-react';
 import { TicketList } from './TicketList';
 import { BillingSection } from './BillingSection';
@@ -20,6 +21,7 @@ interface CustomerDetailProps {
   onAddDevice?: () => void;
   onEditDevice?: (device: NetworkDevice) => void;
   onDeleteDevice?: (id: string) => void;
+  plans?: SubscriptionPlan[]; // Added plans for relational billing
 }
 
 const CustomerStatusBadge = ({ status }: { status: CustomerStatus }) => {
@@ -50,7 +52,8 @@ export const CustomerDetail: React.FC<CustomerDetailProps> = ({
   devices = [],
   onAddDevice,
   onEditDevice,
-  onDeleteDevice
+  onDeleteDevice,
+  plans = []
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'billing' | 'devices'>('overview');
 
@@ -232,7 +235,7 @@ export const CustomerDetail: React.FC<CustomerDetailProps> = ({
 
         {activeTab === 'billing' && (
              <div className="animate-in fade-in duration-300">
-                <BillingSection customer={customer} currency={currency} />
+                <BillingSection customer={customer} currency={currency} plans={plans} />
              </div>
         )}
 
