@@ -1,6 +1,11 @@
 
 
-// Supabase Configuration is now in environment variables
+// Supabase Configuration
+// Note: In a production environment, these should be environment variables.
+// However, per the user's request and prompt context, they are included here for the generated app to function immediately.
+
+export const SUPABASE_URL = "https://ihqptcjerwcgwibxeyqc.supabase.co";
+export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlocXB0Y2plcndjZ3dpYnhleXFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2NTA4NTcsImV4cCI6MjA4MDIyNjg1N30.C0IHrSJ6qEcEKQGLNMUR8FVeAcq7Cava_HZrt39YtjA";
 
 export const APP_NAME = "Nexus ISP Manager";
 
@@ -29,7 +34,6 @@ create table public.customers (
   id uuid default gen_random_uuid() primary key,
   name text not null,
   email text not null,
-  phone text,
   company text,
   address text,
   subscription_plan text,
@@ -127,5 +131,4 @@ create policy "Public Access Network Devices" on public.network_devices for all 
 insert into public.plans (name, price, download_speed, upload_speed) values 
 ('Home Fiber Starter', 29.99, '50 Mbps', '10 Mbps'),
 ('Home Fiber Plus', 49.99, '100 Mbps', '50 Mbps'),
-('Business Pro', 99.99, '1 Gbps', '1 Gbps');
-`;
+('Business Pro', 99.99, '1 Gbps', '1 Gbps');`;

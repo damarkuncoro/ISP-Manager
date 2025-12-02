@@ -240,9 +240,9 @@ export const CustomerDetail: React.FC<CustomerDetailProps> = ({
             <div className="animate-in fade-in duration-300">
                 <CustomerDevices 
                     devices={devices} 
-                    onAddDevice={onAddDevice!} 
-                    onEditDevice={onEditDevice!} 
-                    onDeleteDevice={onDeleteDevice!}
+                    onAddDevice={onAddDevice ?? (() => {})} 
+                    onEditDevice={onEditDevice ?? (() => {})} 
+                    onDeleteDevice={onDeleteDevice ?? (() => {})}
                 />
             </div>
         )}

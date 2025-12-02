@@ -58,14 +58,13 @@ export interface SubscriptionPlan {
 }
 
 export interface Customer {
-  id: string;
+  id: string; 
   name: string;
   email: string;
-  phone?: string;
   company?: string;
   address?: string;
-  subscription_plan?: string;
-  plan_id?: string;
+  subscription_plan?: string; 
+  plan_id?: string; 
   account_status: CustomerStatus;
   created_at: string;
 }
