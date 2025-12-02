@@ -1,4 +1,3 @@
-
 export enum TicketStatus {
   OPEN = 'open',
   IN_PROGRESS = 'in_progress',
@@ -11,12 +10,22 @@ export enum TicketPriority {
   HIGH = 'high',
 }
 
+// Keep enum for code references / default fallbacks, but data will drive UI
 export enum TicketCategory {
   INTERNET = 'internet_issue',
   BILLING = 'billing',
   HARDWARE = 'hardware',
   INSTALLATION = 'installation',
   OTHER = 'other',
+}
+
+export interface TicketCategoryConfig {
+  id: string;
+  name: string;
+  code: string;
+  sla_hours: number;
+  description: string;
+  created_at?: string;
 }
 
 export enum CustomerStatus {
@@ -101,12 +110,11 @@ export interface Ticket {
   description: string;
   status: TicketStatus;
   priority: TicketPriority;
-  category: TicketCategory;
+  category: string; // Changed from enum to string to support dynamic values
   created_at: string;
   customer_id?: string | null; 
   customer?: Customer;
   is_escalated?: boolean; 
-  // Enhanced fields
   assigned_to?: string;
   due_date?: string;
   resolution_notes?: string;
@@ -153,7 +161,6 @@ export interface NetworkDevice {
   location?: string;
   last_check: string;
   created_at: string;
-  // Technical Specs
   model?: string;
   serial_number?: string;
   firmware_version?: string;
@@ -165,4 +172,4 @@ export type TicketStats = {
   inProgress: number;
   closed: number;
   highPriority: number;
-};
+}

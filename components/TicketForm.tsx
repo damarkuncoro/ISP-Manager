@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { Ticket, TicketStatus, TicketPriority, TicketCategory, Customer, Employee } from '../types';
+import { Ticket, TicketStatus, TicketPriority, TicketCategory, Customer, Employee, TicketCategoryConfig } from '../types';
 import { X, Save, User, Calendar, Briefcase, FileText, Tag, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 
 interface TicketFormProps {
@@ -11,6 +10,7 @@ interface TicketFormProps {
   isLoading: boolean;
   customers: Customer[];
   employees: Employee[];
+  categories: TicketCategoryConfig[]; // New Prop
 }
 
 export const TicketForm: React.FC<TicketFormProps> = ({ 
@@ -19,13 +19,14 @@ export const TicketForm: React.FC<TicketFormProps> = ({
   onSubmit, 
   initialData, 
   customers,
-  employees
+  employees,
+  categories
 }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<TicketStatus>(TicketStatus.OPEN);
   const [priority, setPriority] = useState<TicketPriority>(TicketPriority.MEDIUM);
-  const [category, setCategory] = useState<TicketCategory>(TicketCategory.INTERNET);
+  const [category, setCategory] = useState<string>('internet_issue'); // Default fallback
   const [customerId, setCustomerId] = useState<string>('');
   
   // New Fields
@@ -39,31 +40,41 @@ export const TicketForm: React.FC<TicketFormProps> = ({
   // Determine if we are editing an existing ticket or creating a new one
   const isEditMode = !!(initialData && initialData.id);
 
+  // Set default category on load if we have categories
+  useEffect(() => {
+      if (categories.length > 0 && !category) {
+          setCategory(categories[0].code);
+      }
+  }, [categories]);
+
   useEffect(() => {
     if (initialData) {
       setTitle(initialData.title || '');
       setDescription(initialData.description || '');
       setStatus(initialData.status || TicketStatus.OPEN);
       setPriority(initialData.priority || TicketPriority.MEDIUM);
-      setCategory(initialData.category || TicketCategory.INTERNET);
+      // Use existing code, or fallback to first category code
+      setCategory(initialData.category || (categories.length > 0 ? categories[0].code : 'internet_issue'));
       setCustomerId(initialData.customer_id || '');
       setAssignedTo(initialData.assigned_to || '');
-      // Format date for input[type="date"]
       setDueDate(initialData.due_date ? new Date(initialData.due_date).toISOString().split('T')[0] : '');
       setResolutionNotes(initialData.resolution_notes || '');
     } else {
       resetForm();
-      // Trigger default SLA calc
-      updateDueDateFromSLA(TicketCategory.INTERNET);
+      if (categories.length > 0) {
+          const defaultCat = categories[0];
+          setCategory(defaultCat.code);
+          updateDueDateFromSLA(defaultCat);
+      }
     }
-  }, [initialData, isOpen]);
+  }, [initialData, isOpen, categories]);
 
   const resetForm = () => {
     setTitle('');
     setDescription('');
     setStatus(TicketStatus.OPEN);
     setPriority(TicketPriority.MEDIUM);
-    setCategory(TicketCategory.INTERNET);
+    // category reset handled in useEffect based on available categories
     setCustomerId('');
     setAssignedTo('');
     setDueDate('');
@@ -72,41 +83,21 @@ export const TicketForm: React.FC<TicketFormProps> = ({
   };
 
   // Helper to calculate Due Date based on category SLA settings
-  const updateDueDateFromSLA = (selectedCategory: TicketCategory) => {
+  const updateDueDateFromSLA = (catConfig: TicketCategoryConfig) => {
       // Only auto-update if not in edit mode (don't overwrite existing due dates on edit)
       if (isEditMode) return;
 
-      const savedCategories = localStorage.getItem('nexus_categories');
-      let slaHours = 24; // Default if not found
-
-      if (savedCategories) {
-          try {
-              const parsed = JSON.parse(savedCategories);
-              const config = parsed.find((c: any) => c.id === selectedCategory);
-              if (config && config.slaHours) {
-                  slaHours = config.slaHours;
-              }
-          } catch (e) {
-              console.error("Error reading category SLA settings");
-          }
-      } else {
-          // Fallbacks matching default config in SettingsView
-          switch(selectedCategory) {
-              case TicketCategory.INTERNET: slaHours = 4; break;
-              case TicketCategory.HARDWARE: slaHours = 48; break;
-              case TicketCategory.INSTALLATION: slaHours = 72; break;
-              default: slaHours = 24;
-          }
-      }
-
       const date = new Date();
-      date.setHours(date.getHours() + slaHours);
+      date.setHours(date.getHours() + (catConfig.sla_hours || 24));
       setDueDate(date.toISOString().split('T')[0]);
   };
 
-  const handleCategoryChange = (newCategory: TicketCategory) => {
-      setCategory(newCategory);
-      updateDueDateFromSLA(newCategory);
+  const handleCategoryChange = (newCode: string) => {
+      setCategory(newCode);
+      const catConfig = categories.find(c => c.code === newCode);
+      if (catConfig) {
+          updateDueDateFromSLA(catConfig);
+      }
   };
 
   const validate = () => {
@@ -267,13 +258,17 @@ export const TicketForm: React.FC<TicketFormProps> = ({
                                 id="category"
                                 className="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                                 value={category}
-                                onChange={(e) => handleCategoryChange(e.target.value as TicketCategory)}
+                                onChange={(e) => handleCategoryChange(e.target.value)}
                             >
-                                <option value={TicketCategory.INTERNET}>Internet Issue</option>
-                                <option value={TicketCategory.BILLING}>Billing</option>
-                                <option value={TicketCategory.HARDWARE}>Hardware / Router</option>
-                                <option value={TicketCategory.INSTALLATION}>Installation</option>
-                                <option value={TicketCategory.OTHER}>Other</option>
+                                {categories.length > 0 ? (
+                                    categories.map((cat) => (
+                                        <option key={cat.id} value={cat.code}>
+                                            {cat.name}
+                                        </option>
+                                    ))
+                                ) : (
+                                    <option value="internet_issue">Internet Issue (Default)</option>
+                                )}
                             </select>
                         </div>
 

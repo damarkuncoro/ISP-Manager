@@ -1,32 +1,15 @@
-
 import React, { useState, useEffect } from 'react';
-import { Copy, Check, Database, Server, ShieldCheck, Download, Globe, Tag, Save } from 'lucide-react';
+import { Copy, Check, Database, Server, ShieldCheck, Download, Globe, Tag, Save, Plus, Trash2, Edit2, X } from 'lucide-react';
 import { SETUP_SQL, SUPABASE_URL } from '../constants';
 import { AVAILABLE_CURRENCIES } from '../utils/formatters';
-import { TicketCategory } from '../types';
+import { TicketCategoryConfig } from '../types';
+import { useCategories } from '../hooks/useCategories';
 
 interface SettingsViewProps {
   connectionStatus: 'connected' | 'error' | 'loading';
   currency: string;
   onCurrencyChange: (code: string) => void;
 }
-
-// Configuration interface for categories
-interface CategoryConfig {
-  id: TicketCategory;
-  label: string;
-  slaHours: number;
-  description: string;
-}
-
-// Default configuration
-const DEFAULT_CATEGORIES: CategoryConfig[] = [
-  { id: TicketCategory.INTERNET, label: 'Internet Issue', slaHours: 4, description: 'Connectivity problems, slow speeds, packet loss.' },
-  { id: TicketCategory.BILLING, label: 'Billing', slaHours: 24, description: 'Invoice inquiries, payment issues, plan changes.' },
-  { id: TicketCategory.HARDWARE, label: 'Hardware', slaHours: 48, description: 'Router malfunction, cable breaks, equipment replacement.' },
-  { id: TicketCategory.INSTALLATION, label: 'Installation', slaHours: 72, description: 'New service setup, moving services.' },
-  { id: TicketCategory.OTHER, label: 'Other', slaHours: 24, description: 'General inquiries and feedback.' },
-];
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ 
   connectionStatus, 
@@ -35,35 +18,62 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'categories'>('general');
-  const [categories, setCategories] = useState<CategoryConfig[]>(DEFAULT_CATEGORIES);
-  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  
+  // Categories Logic
+  const { categories, loadCategories, addCategory, editCategory, removeCategory } = useCategories();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
+  
+  // Form State
+  const [formData, setFormData] = useState<Partial<TicketCategoryConfig>>({});
 
-  // Load category settings from local storage on mount
   useEffect(() => {
-    const saved = localStorage.getItem('nexus_categories');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // Merge with defaults to ensure all enum values exist if new ones were added
-        const merged = DEFAULT_CATEGORIES.map(def => {
-            const existing = parsed.find((p: any) => p.id === def.id);
-            return existing || def;
-        });
-        setCategories(merged);
-      } catch (e) {
-        console.error("Failed to parse saved categories");
-      }
-    }
-  }, []);
+    loadCategories();
+  }, [loadCategories]);
 
-  const handleSaveCategories = () => {
-    localStorage.setItem('nexus_categories', JSON.stringify(categories));
-    setEditingCategory(null);
-    alert("Category configurations saved successfully! New tickets will use these SLA settings.");
+  const startEdit = (cat: TicketCategoryConfig) => {
+    setFormData(cat);
+    setEditingId(cat.id);
+    setIsAdding(false);
   };
 
-  const updateCategory = (id: string, field: keyof CategoryConfig, value: any) => {
-    setCategories(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
+  const startAdd = () => {
+    setFormData({ name: '', code: '', sla_hours: 24, description: '' });
+    setEditingId(null);
+    setIsAdding(true);
+  };
+
+  const cancelEdit = () => {
+    setFormData({});
+    setEditingId(null);
+    setIsAdding(false);
+  };
+
+  const handleSave = async () => {
+    if (!formData.name || !formData.code || !formData.sla_hours) {
+        alert("Please fill in required fields (Name, Code, SLA)");
+        return;
+    }
+
+    try {
+        if (isAdding) {
+            await addCategory(formData as any);
+        } else if (editingId) {
+            await editCategory(editingId, formData);
+        }
+        cancelEdit();
+    } catch (e: any) {
+        alert("Failed to save: " + e.message);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+      if(!window.confirm("Delete this category?")) return;
+      try {
+          await removeCategory(id);
+      } catch (e: any) {
+          alert("Failed to delete: " + e.message);
+      }
   };
   
   const handleCopySQL = () => {
@@ -216,13 +226,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     </h3>
                     <p className="text-xs text-gray-500 mt-1">Configure default service level agreements (SLA) for each category.</p>
                   </div>
-                  {editingCategory && (
+                  {!isAdding && !editingId && (
                     <button 
-                        onClick={handleSaveCategories}
+                        onClick={startAdd}
                         className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
                     >
-                        <Save className="w-4 h-4" />
-                        Save Changes
+                        <Plus className="w-4 h-4" />
+                        Add Category
                     </button>
                   )}
               </div>
@@ -231,75 +241,137 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                           <tr>
-                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category ID</th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code (Slug)</th>
                               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">SLA (Hours)</th>
                               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Actions</th>
+                              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Actions</th>
                           </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                          {categories.map((cat) => (
-                              <tr key={cat.id} className={`transition-colors ${editingCategory === cat.id ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
+                          {isAdding && (
+                              <tr className="bg-blue-50">
                                   <td className="px-6 py-4">
-                                      <div className="text-sm font-bold text-gray-900">{cat.label}</div>
-                                      <div className="text-xs text-gray-400 font-mono mt-0.5">{cat.id}</div>
+                                      <input 
+                                        type="text" 
+                                        className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm p-1 border"
+                                        placeholder="e.g. VoIP"
+                                        value={formData.name || ''}
+                                        onChange={(e) => setFormData({...formData, name: e.target.value})}
+                                      />
                                   </td>
                                   <td className="px-6 py-4">
-                                      <div className="flex items-center">
-                                          {editingCategory === cat.id ? (
+                                      <input 
+                                        type="text" 
+                                        className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm p-1 border"
+                                        placeholder="e.g. voip_issue"
+                                        value={formData.code || ''}
+                                        onChange={(e) => setFormData({...formData, code: e.target.value.toLowerCase().replace(/\s+/g, '_')})}
+                                      />
+                                  </td>
+                                  <td className="px-6 py-4">
+                                      <input 
+                                        type="number" 
+                                        className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm p-1 border text-right"
+                                        value={formData.sla_hours || 24}
+                                        onChange={(e) => setFormData({...formData, sla_hours: parseInt(e.target.value)})}
+                                      />
+                                  </td>
+                                  <td className="px-6 py-4">
+                                      <input 
+                                        type="text" 
+                                        className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm p-1 border"
+                                        placeholder="Description..."
+                                        value={formData.description || ''}
+                                        onChange={(e) => setFormData({...formData, description: e.target.value})}
+                                      />
+                                  </td>
+                                  <td className="px-6 py-4 text-right whitespace-nowrap">
+                                      <div className="flex gap-2 justify-end">
+                                          <button onClick={handleSave} className="text-green-600 hover:text-green-800"><Save className="w-4 h-4" /></button>
+                                          <button onClick={cancelEdit} className="text-gray-500 hover:text-gray-700"><X className="w-4 h-4" /></button>
+                                      </div>
+                                  </td>
+                              </tr>
+                          )}
+                          
+                          {categories.map((cat) => (
+                              <tr key={cat.id} className={`transition-colors ${editingId === cat.id ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
+                                  <td className="px-6 py-4">
+                                      {editingId === cat.id ? (
+                                          <input 
+                                            type="text" 
+                                            className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm p-1 border"
+                                            value={formData.name || ''}
+                                            onChange={(e) => setFormData({...formData, name: e.target.value})}
+                                          />
+                                      ) : (
+                                          <div className="text-sm font-bold text-gray-900">{cat.name}</div>
+                                      )}
+                                  </td>
+                                  <td className="px-6 py-4">
+                                      {editingId === cat.id ? (
+                                          <input 
+                                            type="text" 
+                                            disabled // Code usually shouldn't change as it breaks relations
+                                            className="block w-full bg-gray-100 border-gray-300 rounded-md shadow-sm sm:text-sm p-1 border text-gray-500 cursor-not-allowed"
+                                            value={formData.code || ''}
+                                          />
+                                      ) : (
+                                          <div className="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-0.5 rounded w-fit">{cat.code}</div>
+                                      )}
+                                  </td>
+                                  <td className="px-6 py-4">
+                                      {editingId === cat.id ? (
+                                          <div className="flex items-center">
                                               <input 
                                                 type="number" 
                                                 min="1"
                                                 className="block w-20 border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm p-1 border text-right mr-2"
-                                                value={cat.slaHours}
-                                                onChange={(e) => updateCategory(cat.id, 'slaHours', parseInt(e.target.value) || 0)}
+                                                value={formData.sla_hours || 0}
+                                                onChange={(e) => setFormData({...formData, sla_hours: parseInt(e.target.value) || 0})}
                                               />
-                                          ) : (
-                                              <span className={`text-sm font-bold mr-2 ${cat.slaHours <= 4 ? 'text-red-600' : 'text-gray-700'}`}>{cat.slaHours}</span>
-                                          )}
-                                          <span className="text-xs text-gray-500">hours</span>
-                                      </div>
+                                              <span className="text-xs text-gray-500">hrs</span>
+                                          </div>
+                                      ) : (
+                                          <div className="flex items-center">
+                                              <span className={`text-sm font-bold mr-2 ${cat.sla_hours <= 4 ? 'text-red-600' : 'text-gray-700'}`}>{cat.sla_hours}</span>
+                                              <span className="text-xs text-gray-500">hours</span>
+                                          </div>
+                                      )}
                                   </td>
                                   <td className="px-6 py-4">
-                                      {editingCategory === cat.id ? (
+                                      {editingId === cat.id ? (
                                           <input 
                                             type="text" 
                                             className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm p-1 border"
-                                            value={cat.description}
-                                            onChange={(e) => updateCategory(cat.id, 'description', e.target.value)}
+                                            value={formData.description || ''}
+                                            onChange={(e) => setFormData({...formData, description: e.target.value})}
                                           />
                                       ) : (
-                                          <div className="text-sm text-gray-500">{cat.description}</div>
+                                          <div className="text-sm text-gray-500 truncate max-w-xs">{cat.description}</div>
                                       )}
                                   </td>
-                                  <td className="px-6 py-4 text-right">
-                                      {editingCategory === cat.id ? (
+                                  <td className="px-6 py-4 text-right whitespace-nowrap">
+                                      {editingId === cat.id ? (
                                           <div className="flex gap-2 justify-end">
-                                              <button 
-                                                onClick={handleSaveCategories}
-                                                className="text-green-600 hover:text-green-800 text-sm font-medium"
-                                              >
-                                                  Save
-                                              </button>
+                                              <button onClick={handleSave} className="text-green-600 hover:text-green-800"><Save className="w-4 h-4" /></button>
+                                              <button onClick={cancelEdit} className="text-gray-500 hover:text-gray-700"><X className="w-4 h-4" /></button>
                                           </div>
                                       ) : (
-                                          <button 
-                                            onClick={() => setEditingCategory(cat.id)}
-                                            className="text-primary-600 hover:text-primary-800 text-sm font-medium"
-                                          >
-                                              Edit
-                                          </button>
+                                          <div className="flex gap-2 justify-end">
+                                              <button onClick={() => startEdit(cat)} className="text-primary-600 hover:text-primary-800"><Edit2 className="w-4 h-4" /></button>
+                                              <button onClick={() => handleDelete(cat.id)} className="text-red-600 hover:text-red-800"><Trash2 className="w-4 h-4" /></button>
+                                          </div>
                                       )}
                                   </td>
                               </tr>
                           ))}
                       </tbody>
                   </table>
-              </div>
-              <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-                  <p className="text-xs text-gray-500 italic">
-                      Note: Changes to SLA times will affect the default due date for new tickets created under these categories.
-                  </p>
+                  {categories.length === 0 && (
+                      <div className="text-center py-8 text-gray-500 italic">No categories found. Add one or run SQL setup.</div>
+                  )}
               </div>
           </div>
       )}

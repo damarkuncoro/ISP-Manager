@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Layout } from './components/Layout';
 import { StatsOverview } from './components/StatsOverview';
@@ -26,6 +25,7 @@ import { useCustomers } from './hooks/useCustomers';
 import { usePlans } from './hooks/usePlans';
 import { useDevices } from './hooks/useDevices';
 import { useEmployees } from './hooks/useEmployees';
+import { useCategories } from './hooks/useCategories';
 import { useAuth } from './contexts/AuthContext';
 import { getSafeErrorMessage, isSetupError } from './utils/errorHelpers';
 
@@ -84,8 +84,15 @@ export const App: React.FC = () => {
     removeEmployee
   } = useEmployees();
 
+  // Hook for Categories
+  const {
+    categories,
+    loading: categoriesLoading,
+    loadCategories
+  } = useCategories();
+
   // Aggregate State
-  const loading = ticketsLoading || customersLoading || plansLoading || devicesLoading || employeesLoading;
+  const loading = ticketsLoading || customersLoading || plansLoading || devicesLoading || employeesLoading || categoriesLoading;
   const globalError = ticketsError || customersError;
   const [setupError, setSetupError] = useState(false);
 
@@ -130,11 +137,11 @@ export const App: React.FC = () => {
   const loadData = useCallback(async () => {
     setSetupError(false);
     try {
-      await Promise.all([loadTickets(), loadCustomers(), loadPlans(), loadDevices(), loadEmployees()]);
+      await Promise.all([loadTickets(), loadCustomers(), loadPlans(), loadDevices(), loadEmployees(), loadCategories()]);
     } catch (err) {
       console.error("Data load failed via hooks");
     }
-  }, [loadTickets, loadCustomers, loadPlans, loadDevices, loadEmployees]);
+  }, [loadTickets, loadCustomers, loadPlans, loadDevices, loadEmployees, loadCategories]);
 
   useEffect(() => {
     loadData();
@@ -147,100 +154,92 @@ export const App: React.FC = () => {
   }, [ticketsError, customersError]);
 
   // --- View Handlers ---
-  
   const handleViewChange = (newView: typeof view) => {
-    setPreviousView(null); // Clear history on manual navigation
+    setPreviousView(null); 
     setView(newView);
-    // Reset specific view states when navigating away
-    if (newView !== 'customers') {
-      setSelectedCustomer(null);
-      setCustomerSearch('');
-    }
-    if (newView !== 'plans') {
-      setSelectedPlan(null);
-    }
-    if (newView !== 'tickets') {
-      setSelectedTicket(null);
-    }
-    if (newView !== 'employees') {
-      setSelectedEmployee(null);
-    }
+    if (newView !== 'customers') { setSelectedCustomer(null); setCustomerSearch(''); }
+    if (newView !== 'plans') setSelectedPlan(null);
+    if (newView !== 'tickets') setSelectedTicket(null);
+    if (newView !== 'employees') setSelectedEmployee(null);
   };
 
   const handleCustomerClick = (customerId: string) => {
     const customer = customers.find(c => c.id === customerId);
-    if (customer) {
-      setSelectedCustomer(customer);
-      setView('customers');
-    }
+    if (customer) { setSelectedCustomer(customer); setView('customers'); }
   };
 
   const handlePlanClick = (planId: string) => {
     const plan = plans.find(p => p.id === planId);
-    if (plan) {
-      setSelectedPlan(plan);
-      setView('plans');
-    }
+    if (plan) { setSelectedPlan(plan); setView('plans'); }
   };
 
   const handleTicketClick = (ticket: Ticket) => {
-    setPreviousView(view); // Save where we came from (e.g., customers detail)
+    setPreviousView(view);
     setSelectedTicket(ticket);
     setView('tickets');
   };
 
-  // --- Ticket Handlers ---
-
-  const handleCreateTicket = async (ticketData: Omit<Ticket, 'id' | 'created_at' | 'customer'>) => {
-    try {
-      await addTicket(ticketData);
-      setIsTicketFormOpen(false);
-    } catch (err) {
-      alert("Failed to create ticket: " + getSafeErrorMessage(err));
-    }
+  // --- Actions Handlers ---
+  const handleCreateTicket = async (ticketData: any) => {
+    try { await addTicket(ticketData); setIsTicketFormOpen(false); } catch (err) { alert("Failed: " + getSafeErrorMessage(err)); }
   };
-
-  const handleUpdateTicket = async (id: string, updates: Partial<Ticket>) => {
-    try {
-      const updated = await editTicket(id, updates);
-      setIsTicketFormOpen(false);
-      setEditingTicket(null);
-      // Update selected ticket view if currently open
-      if (selectedTicket && selectedTicket.id === id) {
-         setSelectedTicket(updated);
-      }
-    } catch (err) {
-      alert("Failed to update ticket: " + getSafeErrorMessage(err));
-    }
+  const handleUpdateTicket = async (id: string, updates: any) => {
+    try { 
+        const updated = await editTicket(id, updates); 
+        setIsTicketFormOpen(false); setEditingTicket(null); 
+        if (selectedTicket && selectedTicket.id === id) setSelectedTicket(updated);
+    } catch (err) { alert("Failed: " + getSafeErrorMessage(err)); }
   };
-
   const handleDeleteTicket = async (id: string) => {
-    if (!hasPermission('delete_records')) {
-      alert("You do not have permission to delete tickets.");
-      return;
-    }
-    if (!window.confirm("Are you sure you want to delete this ticket?")) return;
-    try {
-      await removeTicket(id);
-      if (selectedTicket?.id === id) {
-          setSelectedTicket(null);
-          if (previousView && previousView !== 'tickets') {
-              setView(previousView);
-              setPreviousView(null);
-          }
-      }
-    } catch (err) {
-      alert("Failed to delete ticket: " + getSafeErrorMessage(err));
-    }
+    if(!window.confirm("Delete ticket?")) return;
+    try { 
+        await removeTicket(id); 
+        if (selectedTicket?.id === id) { setSelectedTicket(null); if (previousView) setView(previousView as any); }
+    } catch (err) { alert("Failed to delete"); }
+  };
+
+  const handleCreateCustomer = async (d:any) => { try { await addCustomer(d); setIsCustomerFormOpen(false); } catch(e) { alert(e); }};
+  const handleDeleteCustomer = async (id:string) => { if(window.confirm("Delete customer?")) try { await removeCustomer(id); if(selectedCustomer?.id===id) setSelectedCustomer(null); loadTickets(); } catch(e) { alert(e); }};
+  
+  const handleCreatePlan = async (d:any) => { try { await addPlan(d); setIsPlanFormOpen(false); } catch(e) { alert(e); }};
+  const handleDeletePlan = async (id:string) => { if(window.confirm("Delete plan?")) try { await removePlan(id); if(selectedPlan?.id===id) setSelectedPlan(null); } catch(e) { alert(e); }};
+
+  const handleCreateDevice = async (d:any) => { try { await addDevice(d); setIsDeviceFormOpen(false); setDeviceCustomerId(undefined); } catch(e) { alert(e); }};
+  const handleUpdateDevice = async (d:any) => { if(editingDevice) try { await editDevice(editingDevice.id, d); setIsDeviceFormOpen(false); setEditingDevice(null); setDeviceCustomerId(undefined); } catch(e) { alert(e); }};
+  const handleDeleteDevice = async (id:string) => { if(window.confirm("Delete device?")) try { await removeDevice(id); } catch(e) { alert(e); }};
+
+  const handleCreateEmployee = async (d:any) => { try { await addEmployee(d); setIsEmployeeFormOpen(false); } catch(e) { alert(e); }};
+  const handleUpdateEmployee = async (d:any) => { if(editingEmployee) try { await editEmployee(editingEmployee.id, d); setIsEmployeeFormOpen(false); setEditingEmployee(null); if(selectedEmployee?.id===editingEmployee.id) setSelectedEmployee({...selectedEmployee, ...d}); } catch(e) { alert(e); }};
+  const handleDeleteEmployee = async (id:string) => { if(window.confirm("Delete employee?")) try { await removeEmployee(id); if(selectedEmployee?.id===id) setSelectedEmployee(null); } catch(e) { alert(e); }};
+
+  const handleCopySQL = () => { navigator.clipboard.writeText(SETUP_SQL); setCopied(true); setTimeout(() => setCopied(false), 2000); };
+
+  // Helper for title
+  const getPageTitle = () => {
+      if (view === 'dashboard') return 'Dashboard Overview';
+      if (view === 'customers') return selectedCustomer ? 'Subscriber Details' : 'Subscriber Management';
+      if (view === 'plans') return selectedPlan ? 'Plan Details' : 'Service Packages';
+      if (view === 'network') return 'Network Infrastructure';
+      if (view === 'settings') return 'System Settings';
+      if (view === 'tickets') return selectedTicket ? 'Ticket Details' : 'Ticket Management';
+      if (view === 'employees') return selectedEmployee ? 'Team Member Profile' : 'Team Management';
+      return 'Nexus ISP Manager';
+  };
+
+  // Helper for description
+  const getPageDescription = () => {
+      if (view === 'dashboard') return 'Overview of key metrics and recent activities';
+      if (view === 'customers') return selectedCustomer ? 'View and edit subscriber information' : 'Manage subscriber database and accounts';
+      if (view === 'plans') return selectedPlan ? 'View and edit service plan details' : 'Configure internet subscription packages';
+      if (view === 'network') return 'Monitor status of routers, switches and OLTs';
+      if (view === 'settings') return 'System configuration and database management';
+      if (view === 'tickets') return selectedTicket ? 'View ticket conversation and details' : 'Track and resolve customer support requests';
+      if (view === 'employees') return selectedEmployee ? 'View team member details' : 'Manage staff roles and access';
+      return 'ISP Management System';
   };
 
   const openCreateTicketModal = (preselectedCustomer?: Customer) => {
-    if (preselectedCustomer) {
-      // Initialize with customer ID but NO ticket ID, indicating a "Create" action
-      setEditingTicket({ customer_id: preselectedCustomer.id });
-    } else {
-      setEditingTicket(null);
-    }
+    setEditingTicket(preselectedCustomer ? { customer_id: preselectedCustomer.id } : null);
     setIsTicketFormOpen(true);
   };
 
@@ -249,484 +248,65 @@ export const App: React.FC = () => {
     setIsTicketFormOpen(true);
   };
 
-  // --- Customer Handlers ---
-
-  const handleCreateCustomer = async (customerData: Omit<Customer, 'id' | 'created_at'>) => {
-    try {
-      await addCustomer(customerData);
-      setIsCustomerFormOpen(false);
-    } catch (err) {
-      alert("Failed to create customer: " + getSafeErrorMessage(err));
-    }
-  };
-
-  const handleDeleteCustomer = async (id: string) => {
-    if (!hasPermission('delete_records')) {
-      alert("You do not have permission to delete customers.");
-      return;
-    }
-    if (!window.confirm("Are you sure? This will delete the customer and might affect linked tickets.")) return;
-    try {
-      await removeCustomer(id);
-      if (selectedCustomer?.id === id) {
-          setSelectedCustomer(null);
-      }
-      await loadTickets(); // Refresh tickets as some might be deleted or unlinked
-    } catch (err) {
-      alert("Failed to delete customer.");
-    }
-  };
-
-  // --- Plan Handlers ---
-
-  const handleCreatePlan = async (planData: Omit<SubscriptionPlan, 'id' | 'created_at'>) => {
-    try {
-        await addPlan(planData);
-        setIsPlanFormOpen(false);
-    } catch (err) {
-        alert("Failed to create plan: " + getSafeErrorMessage(err));
-    }
-  };
-
-  const handleDeletePlan = async (id: string) => {
-      if (!hasPermission('delete_records')) {
-        alert("You do not have permission to delete plans.");
-        return;
-      }
-      if (!window.confirm("Delete this plan? Customers on this plan will keep their data but lose the link.")) return;
-      try {
-          await removePlan(id);
-          if (selectedPlan?.id === id) {
-              setSelectedPlan(null);
-          }
-      } catch (err) {
-          alert("Failed to delete plan.");
-      }
-  };
-
-  // --- Device Handlers ---
-
-  const handleCreateDevice = async (deviceData: Omit<NetworkDevice, 'id' | 'created_at' | 'last_check'>) => {
-    if (!hasPermission('manage_network')) {
-       alert("You do not have permission to add network devices.");
-       return;
-    }
-    try {
-      await addDevice(deviceData);
-      setIsDeviceFormOpen(false);
-      setDeviceCustomerId(undefined); // Reset customer context
-    } catch (err) {
-      alert("Failed to create device: " + getSafeErrorMessage(err));
-    }
-  };
-
-  const handleUpdateDevice = async (deviceData: any) => {
-    if (!hasPermission('manage_network')) {
-        alert("You do not have permission to edit network devices.");
-        return;
-    }
-    if (!editingDevice) return;
-    try {
-      await editDevice(editingDevice.id, deviceData);
-      setIsDeviceFormOpen(false);
-      setEditingDevice(null);
-      setDeviceCustomerId(undefined);
-    } catch (err) {
-      alert("Failed to update device: " + getSafeErrorMessage(err));
-    }
-  };
-
-  const handleDeleteDevice = async (id: string) => {
-    if (!hasPermission('manage_network')) {
-        alert("You do not have permission to delete network devices.");
-        return;
-    }
-    if (!window.confirm("Are you sure you want to delete this device?")) return;
-    try {
-      await removeDevice(id);
-    } catch (err) {
-      alert("Failed to delete device.");
-    }
-  };
-  
-  const openAddDeviceForCustomer = (customerId: string) => {
-      setDeviceCustomerId(customerId);
-      setEditingDevice(null);
-      setIsDeviceFormOpen(true);
-  };
-
-  // --- Employee Handlers ---
-
-  const handleCreateEmployee = async (employeeData: Omit<Employee, 'id' | 'created_at'>) => {
-    try {
-      await addEmployee(employeeData);
-      setIsEmployeeFormOpen(false);
-    } catch (err) {
-      alert("Failed to create employee: " + getSafeErrorMessage(err));
-    }
-  };
-
-  const handleUpdateEmployee = async (employeeData: any) => {
-    if (!editingEmployee) return;
-    try {
-      await editEmployee(editingEmployee.id, employeeData);
-      setIsEmployeeFormOpen(false);
-      setEditingEmployee(null);
-      // Update selected employee view if open
-      if (selectedEmployee && selectedEmployee.id === editingEmployee.id) {
-          setSelectedEmployee({...selectedEmployee, ...employeeData});
-      }
-    } catch (err) {
-      alert("Failed to update employee: " + getSafeErrorMessage(err));
-    }
-  };
-
-  const handleDeleteEmployee = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this team member?")) return;
-    try {
-      await removeEmployee(id);
-      if (selectedEmployee?.id === id) {
-          setSelectedEmployee(null);
-      }
-    } catch (err) {
-      alert("Failed to delete employee.");
-    }
-  };
-
-  const handleCopySQL = () => {
-    navigator.clipboard.writeText(SETUP_SQL);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const getPageTitle = () => {
-    switch (view) {
-      case 'dashboard': return 'Dashboard Overview';
-      case 'customers': return selectedCustomer ? 'Subscriber Details' : 'Subscriber Management';
-      case 'plans': return selectedPlan ? 'Plan Details' : 'Service Packages';
-      case 'network': return 'Network Infrastructure';
-      case 'settings': return 'System Settings';
-      case 'tickets': return selectedTicket ? 'Ticket Details' : 'Ticket Management';
-      case 'employees': return selectedEmployee ? 'Team Member Profile' : 'Team Management';
-      default: return 'Nexus ISP Manager';
-    }
-  };
-
-  const getPageDescription = () => {
-    switch (view) {
-      case 'dashboard': return 'Get a bird\'s eye view of your support performance.';
-      case 'customers': return selectedCustomer ? 'View profile, billing and support history.' : 'Manage your customer database.';
-      case 'plans': return selectedPlan ? 'View plan statistics and active subscribers.' : 'Manage internet subscription packages.';
-      case 'network': return 'Monitor routers, switches, OLTs and link status.';
-      case 'settings': return 'Configure database connections and system parameters.';
-      case 'tickets': return selectedTicket ? 'View full ticket history and information.' : 'Manage, track, and resolve support tickets.';
-      case 'employees': return selectedEmployee ? 'View employee details and assigned tasks.' : 'Manage support agents, technicians, and administrators.';
-      default: return 'Manage, track, and resolve support tickets.';
-    }
-  };
-
-  // Determine which component to render
   const renderContent = () => {
-    // Role-Based Access Control Checks
-    if (view === 'settings' && !hasPermission('manage_settings')) {
-        return <AccessDenied onBack={() => setView('dashboard')} requiredRole="Admin" />;
-    }
-    if (view === 'employees' && !hasPermission('manage_team')) {
-        return <AccessDenied onBack={() => setView('dashboard')} requiredRole="Admin or Manager" />;
-    }
+    if (view === 'settings' && !hasPermission('manage_settings')) return <AccessDenied onBack={() => setView('dashboard')} requiredRole="Admin" />;
+    if (view === 'employees' && !hasPermission('manage_team')) return <AccessDenied onBack={() => setView('dashboard')} requiredRole="Admin or Manager" />;
 
-    if (view === 'settings') {
-      return (
-        <SettingsView 
-          connectionStatus={globalError ? 'error' : 'connected'} 
-          currency={currency}
-          onCurrencyChange={handleCurrencyChange}
-        />
-      );
-    }
+    if (view === 'settings') return <SettingsView connectionStatus={globalError ? 'error' : 'connected'} currency={currency} onCurrencyChange={handleCurrencyChange} />;
 
     if (globalError) {
-      const errorMessage = getSafeErrorMessage(globalError);
-      
-      return (
-          <div className={`mb-6 rounded-lg p-4 border ${setupError ? 'bg-blue-50 border-blue-200' : 'bg-red-50 border-red-200'}`}>
-            <div className="flex">
-              <div className="flex-shrink-0">
-                {setupError ? (
-                   <Database className="h-5 w-5 text-blue-400" aria-hidden="true" />
-                ) : (
-                   <AlertCircle className="h-5 w-5 text-red-400" aria-hidden="true" />
-                )}
-              </div>
-              <div className="ml-3 w-full">
-                <h3 className={`text-sm font-medium ${setupError ? 'text-blue-800' : 'text-red-800'}`}>
-                  {setupError ? 'Database Setup Required' : 'Error Occurred'}
-                </h3>
-                
-                {setupError ? (
-                   <div className="mt-2 text-sm text-blue-700">
-                      <p className="mb-3">The required tables or relationships were not found in Supabase. To fix this:</p>
-                      <ol className="list-decimal list-inside space-y-1 mb-4 ml-1">
-                        <li>Go to your Supabase Project Dashboard.</li>
-                        <li>Open the <strong>SQL Editor</strong>.</li>
-                        <li>Paste and run the following command:</li>
-                      </ol>
-                      
-                      <div className="relative group">
-                        <pre className="p-4 bg-gray-800 text-gray-300 rounded-lg text-xs font-mono overflow-x-auto border border-gray-700">
-                          {SETUP_SQL}
-                        </pre>
-                        <button 
-                          onClick={handleCopySQL}
-                          className="absolute top-2 right-2 flex items-center gap-1 px-2.5 py-1.5 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white text-xs font-medium rounded transition-colors border border-white/10"
-                        >
-                          {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                          {copied ? 'Copied!' : 'Copy SQL'}
-                        </button>
-                      </div>
-                      
-                      <div className="mt-4 flex gap-4">
-                         <button
-                            type="button"
-                            onClick={loadData}
-                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
-                          >
-                            I've created the tables, Refresh
-                          </button>
-                          
-                          {hasPermission('manage_settings') && (
-                              <button
-                                type="button"
-                                onClick={() => setView('settings')}
-                                className="inline-flex items-center px-4 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm"
-                              >
-                                Go to Settings
-                              </button>
-                          )}
-                      </div>
-                   </div>
-                ) : (
-                  <div className="mt-2 text-sm text-red-700">
-                    <p>{errorMessage}</p>
-                    <div className="mt-4">
-                      <button
-                        type="button"
-                        onClick={loadData}
-                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                      >
-                        Retry Connection
-                      </button>
+        return (
+            <div className={`mb-6 rounded-lg p-4 border ${setupError ? 'bg-blue-50 border-blue-200' : 'bg-red-50 border-red-200'}`}>
+                <div className="flex">
+                    <div className="ml-3 w-full">
+                        <h3 className={`text-sm font-medium ${setupError ? 'text-blue-800' : 'text-red-800'}`}>
+                            {setupError ? 'Database Setup Required' : 'Error Occurred'}
+                        </h3>
+                        {setupError ? (
+                            <div className="mt-2 text-sm text-blue-700">
+                                <p className="mb-2">Run this SQL in Supabase:</p>
+                                <div className="relative group">
+                                    <pre className="p-4 bg-gray-800 text-gray-300 rounded-lg text-xs font-mono overflow-x-auto border border-gray-700 max-h-48">{SETUP_SQL}</pre>
+                                    <button onClick={handleCopySQL} className="absolute top-2 right-2 px-2 py-1 bg-white/10 text-white text-xs rounded">{copied ? 'Copied' : 'Copy'}</button>
+                                </div>
+                                <button onClick={loadData} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded shadow-sm">Refresh Data</button>
+                            </div>
+                        ) : (
+                            <p className="mt-2 text-sm text-red-700">{getSafeErrorMessage(globalError)}</p>
+                        )}
                     </div>
-                  </div>
-                )}
-              </div>
+                </div>
             </div>
-          </div>
-      );
+        );
     }
 
-    if (loading) {
-      return (
-        <div className="flex flex-col items-center justify-center h-64">
-          <Loader2 className="w-10 h-10 text-primary-500 animate-spin mb-4" />
-          <p className="text-gray-500">Loading data...</p>
-        </div>
-      );
-    }
+    if (loading) return <div className="flex justify-center h-64 items-center"><Loader2 className="animate-spin w-8 h-8 text-primary-500" /></div>;
 
     switch (view) {
-      case 'dashboard':
-        return (
-          <div className="space-y-6 animate-in fade-in duration-500">
-            <StatsOverview tickets={tickets} />
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
-                <button 
-                  onClick={() => handleViewChange('tickets')}
-                  className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-                >
-                  View All Tickets
-                </button>
-              </div>
-              <TicketList 
-                tickets={tickets.slice(0, 5)} 
-                onEdit={openEditTicketModal} 
-                onDelete={handleDeleteTicket}
-                onCustomerClick={handleCustomerClick}
-                onTicketClick={handleTicketClick}
-                compact
-              />
-            </div>
-          </div>
-        );
-      case 'tickets':
-        if (selectedTicket) {
-          return (
-            <TicketDetail 
-              ticket={selectedTicket}
-              onBack={() => {
-                  setSelectedTicket(null);
-                  if (previousView && previousView !== 'tickets') {
-                      setView(previousView);
-                      setPreviousView(null);
-                  }
-              }}
-              onEdit={openEditTicketModal}
-              onDelete={handleDeleteTicket}
-              onCustomerClick={handleCustomerClick}
-              employees={employees}
-            />
-          );
-        }
-        return (
-          <div className="animate-in slide-in-from-right-4 duration-500">
-            <TicketList 
-              tickets={tickets} 
-              onEdit={openEditTicketModal} 
-              onDelete={handleDeleteTicket}
-              onCustomerClick={handleCustomerClick}
-              onTicketClick={handleTicketClick}
-            />
-          </div>
-        );
-      case 'customers':
-        if (selectedCustomer) {
-           return (
-              <CustomerDetail 
-                customer={selectedCustomer}
-                tickets={tickets.filter(t => t.customer_id === selectedCustomer.id)}
-                onBack={() => setSelectedCustomer(null)}
-                onTicketEdit={openEditTicketModal}
-                onTicketDelete={handleDeleteTicket}
-                currency={currency}
-                onPlanClick={handlePlanClick}
-                onCreateTicket={() => openCreateTicketModal(selectedCustomer)}
-                onTicketClick={handleTicketClick}
-                devices={devices.filter(d => d.customer_id === selectedCustomer.id)}
-                onAddDevice={() => openAddDeviceForCustomer(selectedCustomer.id)}
-                onEditDevice={(device) => {
-                    setEditingDevice(device);
-                    setDeviceCustomerId(selectedCustomer.id);
-                    setIsDeviceFormOpen(true);
-                }}
-                onDeleteDevice={handleDeleteDevice}
-                plans={plans} // Pass plans for billing relation
-              />
-           )
-        }
-        return (
-          <div className="animate-in slide-in-from-right-4 duration-500">
-            <CustomerList
-              customers={customers}
-              onDelete={handleDeleteCustomer}
-              onSelect={setSelectedCustomer}
-              initialSearch={customerSearch}
-            />
-          </div>
-        );
-      case 'plans':
-          if (selectedPlan) {
-              return (
-                  <PlanDetail
-                    plan={selectedPlan}
-                    customers={customers}
-                    onBack={() => setSelectedPlan(null)}
-                    onEdit={(plan) => {
-                        setEditingPlan(plan);
-                        setIsPlanFormOpen(true);
-                    }}
-                    onDelete={handleDeletePlan}
-                    onCustomerClick={handleCustomerClick}
-                    currency={currency}
-                  />
-              );
-          }
-          return (
-              <PlansView 
-                plans={plans}
-                customers={customers}
-                onSelectPlan={setSelectedPlan}
-                currency={currency}
-              />
-          );
-      case 'network':
-          return (
-              <NetworkView 
-                devices={devices}
-                onAddDevice={() => {
-                    setEditingDevice(null);
-                    setDeviceCustomerId(undefined);
-                    setIsDeviceFormOpen(true);
-                }}
-                onEditDevice={(device) => {
-                    setEditingDevice(device);
-                    setDeviceCustomerId(device.customer_id);
-                    setIsDeviceFormOpen(true);
-                }}
-                onDeleteDevice={handleDeleteDevice}
-                onRefresh={loadDevices}
-              />
-          );
-      case 'employees':
-          if (selectedEmployee) {
-              return (
-                  <EmployeeDetail 
-                    employee={selectedEmployee}
-                    assignedTickets={tickets.filter(t => t.assigned_to === selectedEmployee.name)}
-                    onBack={() => setSelectedEmployee(null)}
-                    onEdit={(emp) => {
-                        setEditingEmployee(emp);
-                        setIsEmployeeFormOpen(true);
-                    }}
-                    onDelete={handleDeleteEmployee}
-                    onTicketClick={handleTicketClick}
-                  />
-              );
-          }
-          return (
-              <div className="animate-in slide-in-from-right-4 duration-500">
-                  <EmployeeList 
-                      employees={employees}
-                      onEdit={(emp) => {
-                          setEditingEmployee(emp);
-                          setIsEmployeeFormOpen(true);
-                      }}
-                      onDelete={handleDeleteEmployee}
-                      onSelect={setSelectedEmployee}
-                  />
-              </div>
-          );
-      default:
-        return null;
+        case 'dashboard': return <><StatsOverview tickets={tickets} /><div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6"><div className="flex justify-between items-center mb-6"><h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2><button onClick={() => setView('tickets')} className="text-primary-600 text-sm font-medium">View All</button></div><TicketList tickets={tickets.slice(0, 5)} onEdit={openEditTicketModal} onDelete={handleDeleteTicket} onTicketClick={handleTicketClick} compact /></div></>;
+        case 'tickets': return selectedTicket ? <TicketDetail ticket={selectedTicket} onBack={() => {setSelectedTicket(null); if(previousView) setView(previousView as any);}} onEdit={openEditTicketModal} onDelete={handleDeleteTicket} onCustomerClick={handleCustomerClick} employees={employees} /> : <TicketList tickets={tickets} onEdit={openEditTicketModal} onDelete={handleDeleteTicket} onCustomerClick={handleCustomerClick} onTicketClick={handleTicketClick} />;
+        case 'customers': return selectedCustomer ? <CustomerDetail customer={selectedCustomer} tickets={tickets.filter(t => t.customer_id === selectedCustomer.id)} onBack={() => setSelectedCustomer(null)} onTicketEdit={openEditTicketModal} onTicketDelete={handleDeleteTicket} currency={currency} onPlanClick={handlePlanClick} onCreateTicket={() => openCreateTicketModal(selectedCustomer)} onTicketClick={handleTicketClick} devices={devices.filter(d => d.customer_id === selectedCustomer.id)} onAddDevice={() => {setDeviceCustomerId(selectedCustomer.id); setEditingDevice(null); setIsDeviceFormOpen(true);}} onEditDevice={(d) => {setEditingDevice(d); setDeviceCustomerId(selectedCustomer.id); setIsDeviceFormOpen(true);}} onDeleteDevice={handleDeleteDevice} plans={plans} /> : <CustomerList customers={customers} onDelete={handleDeleteCustomer} onSelect={setSelectedCustomer} initialSearch={customerSearch} />;
+        case 'plans': return selectedPlan ? <PlanDetail plan={selectedPlan} customers={customers} onBack={() => setSelectedPlan(null)} onEdit={(p) => {setEditingPlan(p); setIsPlanFormOpen(true);}} onDelete={handleDeletePlan} onCustomerClick={handleCustomerClick} currency={currency} /> : <PlansView plans={plans} customers={customers} onSelectPlan={setSelectedPlan} currency={currency} />;
+        case 'network': return <NetworkView devices={devices} onAddDevice={() => {setEditingDevice(null); setIsDeviceFormOpen(true);}} onEditDevice={(d) => {setEditingDevice(d); setIsDeviceFormOpen(true);}} onDeleteDevice={handleDeleteDevice} onRefresh={loadDevices} />;
+        case 'employees': return selectedEmployee ? <EmployeeDetail employee={selectedEmployee} assignedTickets={tickets.filter(t => t.assigned_to === selectedEmployee.name)} onBack={() => setSelectedEmployee(null)} onEdit={(e) => {setEditingEmployee(e); setIsEmployeeFormOpen(true);}} onDelete={handleDeleteEmployee} onTicketClick={handleTicketClick} /> : <EmployeeList employees={employees} onEdit={(e) => {setEditingEmployee(e); setIsEmployeeFormOpen(true);}} onDelete={handleDeleteEmployee} onSelect={setSelectedEmployee} />;
+        default: return null;
     }
   };
 
   const shouldShowAddButton = () => {
-    if (view === 'dashboard' || view === 'network' || globalError || selectedCustomer || selectedPlan || selectedTicket || selectedEmployee) return false;
-    
-    // Add permission checks
-    if (view === 'settings') return false; 
-    if (view === 'employees' && !hasPermission('manage_team')) return false;
-
-    return true;
+      if (['dashboard', 'network', 'settings'].includes(view) || globalError || selectedCustomer || selectedPlan || selectedTicket || selectedEmployee) return false;
+      if (view === 'employees' && !hasPermission('manage_team')) return false;
+      return true;
   };
 
   return (
     <Layout currentView={view} onViewChange={handleViewChange}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        {/* Header Section */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
-              {getPageTitle()}
-            </h1>
-            <p className="mt-1 text-sm text-gray-500">
-              {getPageDescription()}
-            </p>
+            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">{getPageTitle()}</h1>
+            <p className="mt-1 text-sm text-gray-500">{getPageDescription()}</p>
           </div>
-          
           {shouldShowAddButton() && (
             <button
               onClick={() => {
@@ -735,7 +315,7 @@ export const App: React.FC = () => {
                   else if (view === 'employees') { setEditingEmployee(null); setIsEmployeeFormOpen(true); }
                   else openCreateTicketModal();
               }}
-              className="inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg shadow-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+              className="inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg shadow-sm"
             >
               <Plus className="w-5 h-5 mr-2" />
               {view === 'customers' ? 'New Customer' : view === 'plans' ? 'New Plan' : view === 'employees' ? 'New Member' : 'New Ticket'}
@@ -745,62 +325,11 @@ export const App: React.FC = () => {
 
         {renderContent()}
 
-        {/* Create/Edit Ticket Modal */}
-        {isTicketFormOpen && (
-          <TicketForm
-            isOpen={isTicketFormOpen}
-            onClose={() => setIsTicketFormOpen(false)}
-            onSubmit={editingTicket && editingTicket.id ? (data) => handleUpdateTicket(editingTicket.id!, data) : handleCreateTicket}
-            initialData={editingTicket || undefined}
-            isLoading={false}
-            customers={customers}
-            employees={employees}
-          />
-        )}
-
-        {/* Create Customer Modal */}
-        {isCustomerFormOpen && (
-          <CustomerForm 
-            isOpen={isCustomerFormOpen}
-            onClose={() => setIsCustomerFormOpen(false)}
-            onSubmit={handleCreateCustomer}
-            plans={plans}
-            currency={currency}
-          />
-        )}
-
-        {/* Create/Edit Plan Modal */}
-        {isPlanFormOpen && (
-            <PlanForm
-                isOpen={isPlanFormOpen}
-                onClose={() => setIsPlanFormOpen(false)}
-                onSubmit={handleCreatePlan}
-                initialData={editingPlan || undefined}
-                currency={currency}
-            />
-        )}
-
-        {/* Create/Edit Device Modal */}
-        {isDeviceFormOpen && (
-            <DeviceForm
-                isOpen={isDeviceFormOpen}
-                onClose={() => setIsDeviceFormOpen(false)}
-                onSubmit={editingDevice ? handleUpdateDevice : handleCreateDevice}
-                initialData={editingDevice || undefined}
-                customerId={deviceCustomerId}
-            />
-        )}
-        
-        {/* Create/Edit Employee Modal */}
-        {isEmployeeFormOpen && (
-            <EmployeeForm
-                isOpen={isEmployeeFormOpen}
-                onClose={() => setIsEmployeeFormOpen(false)}
-                onSubmit={editingEmployee ? handleUpdateEmployee : handleCreateEmployee}
-                initialData={editingEmployee || undefined}
-            />
-        )}
-
+        {isTicketFormOpen && <TicketForm isOpen={isTicketFormOpen} onClose={() => setIsTicketFormOpen(false)} onSubmit={editingTicket && editingTicket.id ? (d) => handleUpdateTicket(editingTicket.id!, d) : handleCreateTicket} initialData={editingTicket || undefined} isLoading={false} customers={customers} employees={employees} categories={categories} />}
+        {isCustomerFormOpen && <CustomerForm isOpen={isCustomerFormOpen} onClose={() => setIsCustomerFormOpen(false)} onSubmit={handleCreateCustomer} plans={plans} currency={currency} />}
+        {isPlanFormOpen && <PlanForm isOpen={isPlanFormOpen} onClose={() => setIsPlanFormOpen(false)} onSubmit={handleCreatePlan} initialData={editingPlan || undefined} currency={currency} />}
+        {isDeviceFormOpen && <DeviceForm isOpen={isDeviceFormOpen} onClose={() => setIsDeviceFormOpen(false)} onSubmit={editingDevice ? handleUpdateDevice : handleCreateDevice} initialData={editingDevice || undefined} customerId={deviceCustomerId} />}
+        {isEmployeeFormOpen && <EmployeeForm isOpen={isEmployeeFormOpen} onClose={() => setIsEmployeeFormOpen(false)} onSubmit={editingEmployee ? handleUpdateEmployee : handleCreateEmployee} initialData={editingEmployee || undefined} />}
       </div>
     </Layout>
   );

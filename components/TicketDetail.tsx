@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
-import { Ticket, TicketStatus, TicketPriority, TicketCategory, Employee } from '../types';
-import { ArrowLeft, Edit2, Trash2, User, MapPin, Calendar, Clock, CheckCircle2, AlertCircle, Wifi, CreditCard, Router, Wrench, HelpCircle, FileText, Activity, Send, AlertTriangle, CheckSquare, X, ShieldAlert } from 'lucide-react';
+import { Ticket, TicketStatus, TicketPriority, Employee } from '../types';
+import { ArrowLeft, Edit2, Trash2, User, MapPin, Calendar, Clock, CheckCircle2, AlertCircle, Wifi, CreditCard, Router, Wrench, HelpCircle, FileText, Activity, Send, AlertTriangle, CheckSquare, X, ShieldAlert, Tag } from 'lucide-react';
 import { useComments } from '../hooks/useComments';
 
 interface TicketDetailProps {
@@ -50,20 +49,20 @@ const PriorityBadge = ({ priority }: { priority: TicketPriority }) => {
   );
 };
 
-const CategoryIcon = ({ category }: { category: TicketCategory }) => {
-  const config = {
-    [TicketCategory.INTERNET]: { icon: Wifi, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-    [TicketCategory.BILLING]: { icon: CreditCard, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    [TicketCategory.HARDWARE]: { icon: Router, color: 'text-purple-600', bg: 'bg-purple-50' },
-    [TicketCategory.INSTALLATION]: { icon: Wrench, color: 'text-slate-600', bg: 'bg-slate-50' },
-    [TicketCategory.OTHER]: { icon: HelpCircle, color: 'text-gray-600', bg: 'bg-gray-50' },
-  };
+const CategoryIcon = ({ categoryCode }: { categoryCode: string }) => {
+  // Simple mapping for defaults
+  let Icon = Tag;
+  let color = 'text-gray-600';
+  let bg = 'bg-gray-50';
 
-  const cat = config[category] || config[TicketCategory.OTHER];
-  const Icon = cat.icon;
+  if (categoryCode.includes('internet')) { Icon = Wifi; color = 'text-indigo-600'; bg = 'bg-indigo-50'; }
+  else if (categoryCode.includes('billing')) { Icon = CreditCard; color = 'text-emerald-600'; bg = 'bg-emerald-50'; }
+  else if (categoryCode.includes('hardware')) { Icon = Router; color = 'text-purple-600'; bg = 'bg-purple-50'; }
+  else if (categoryCode.includes('install')) { Icon = Wrench; color = 'text-slate-600'; bg = 'bg-slate-50'; }
+  else if (categoryCode.includes('other')) { Icon = HelpCircle; }
 
   return (
-    <div className={`p-2 rounded-lg ${cat.bg} ${cat.color} inline-block`}>
+    <div className={`p-2 rounded-lg ${bg} ${color} inline-block`}>
       <Icon className="w-6 h-6" />
     </div>
   );
@@ -206,7 +205,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
               </div>
               <div className="p-6">
                  <div className="flex gap-4">
-                    <CategoryIcon category={ticket.category} />
+                    <CategoryIcon categoryCode={ticket.category} />
                     <div className="prose prose-sm text-gray-600 max-w-none">
                        {ticket.description ? (
                          <p className="whitespace-pre-wrap leading-relaxed">{ticket.description}</p>
@@ -346,7 +345,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
                    {/* Category */}
                    <div>
                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Category</span>
-                     <p className="mt-1 text-sm font-medium text-gray-900 capitalize">{ticket.category.replace('_', ' ')}</p>
+                     <p className="mt-1 text-sm font-medium text-gray-900 capitalize">{ticket.category.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}</p>
                   </div>
                </div>
            </div>
