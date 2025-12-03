@@ -177,4 +177,4 @@ insert into public.ticket_categories (name, code, sla_hours, description) values
 ('Billing', 'billing', 24, 'Invoice inquiries, payment issues, plan changes.'),
 ('Hardware', 'hardware', 48, 'Router malfunction, cable breaks, equipment replacement.'),
 ('Installation', 'installation', 72, 'New service setup, moving services.'),
-('Other', 'other', 24, 'General inquiries and feedback.');
+('Other', 'other', 24, 'General inquiries and feedback.')`;

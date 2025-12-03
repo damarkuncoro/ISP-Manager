@@ -10,6 +10,14 @@ interface BillingSectionProps {
   plans: SubscriptionPlan[];
 }
 
+const formatDate = (dateStr: string) => {
+  return new Date(dateStr).toLocaleDateString(undefined, { 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+};
+
 const InvoiceStatusBadge = ({ status }: { status: InvoiceStatus }) => {
   const styles = {
     [InvoiceStatus.PAID]: 'bg-green-100 text-green-800 border-green-200',
@@ -45,12 +53,12 @@ interface InvoiceDetailModalProps {
 }
 
 const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({ invoice, customer, currency, onClose, onUpdateStatus, onDownload }) => {
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString(undefined, { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
+  // formatDate is now available from module scope
+
+  const handleCancel = () => {
+      if (window.confirm("Are you sure you want to cancel this invoice? This action cannot be undone.")) {
+          onUpdateStatus(invoice.id, InvoiceStatus.CANCELLED);
+      }
   };
 
   return (
@@ -155,14 +163,14 @@ const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({ invoice, custom
                   {invoice.status === InvoiceStatus.PENDING || invoice.status === InvoiceStatus.OVERDUE ? (
                      <>
                         <button 
-                           onClick={() => onUpdateStatus(invoice.id, InvoiceStatus.CANCELLED)}
-                           className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+                           onClick={handleCancel}
+                           className="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors"
                         >
                            Cancel Invoice
                         </button>
                         <button 
                            onClick={() => onUpdateStatus(invoice.id, InvoiceStatus.PAID)}
-                           className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 shadow-sm"
+                           className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 shadow-sm transition-colors"
                         >
                            Mark as Paid
                         </button>
@@ -172,6 +180,11 @@ const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({ invoice, custom
                   {invoice.status === InvoiceStatus.PAID && (
                      <span className="flex items-center text-green-600 text-sm font-medium">
                         <CheckCircle2 className="w-5 h-5 mr-2" /> Paid on {formatDate(new Date().toISOString())}
+                     </span>
+                  )}
+                  {invoice.status === InvoiceStatus.CANCELLED && (
+                     <span className="flex items-center text-gray-500 text-sm font-medium">
+                        <X className="w-5 h-5 mr-2" /> Cancelled
                      </span>
                   )}
                </div>
@@ -370,14 +383,6 @@ export const BillingSection: React.FC<BillingSectionProps> = ({ customer, curren
 
   const lastInvoice = invoices[0];
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString(undefined, { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    });
-  };
-
   const isOverdue = (invoice: Invoice) => {
       const due = new Date(invoice.due_date);
       const now = new Date();
@@ -520,7 +525,9 @@ export const BillingSection: React.FC<BillingSectionProps> = ({ customer, curren
                                 <button 
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        handleUpdateStatus(inv.id, InvoiceStatus.CANCELLED);
+                                        if (window.confirm("Are you sure you want to cancel this invoice?")) {
+                                            handleUpdateStatus(inv.id, InvoiceStatus.CANCELLED);
+                                        }
                                     }}
                                     className="text-xs bg-gray-50 text-gray-500 hover:bg-gray-100 px-2 py-1 rounded border border-gray-200"
                                 >
